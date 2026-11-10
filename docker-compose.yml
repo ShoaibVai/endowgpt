@@ -1,0 +1,224 @@
+# endowGPT — root compose stack. This is the single entry point:
+# `docker compose up -d` from this directory starts everything
+# (LibreChat as endowGPT, MongoDB, Meilisearch, RAG API, pgvector, Ollama).
+# Configuration lives in .env and ./LibreChat-main/librechat.yaml.
+
+name: endowgpt
+
+x-common: &common
+  restart: unless-stopped
+
+services:
+  # ---------------------------------------------------------------- endpoint
+  api:
+    <<: *common
+    build:
+      context: ./LibreChat-main
+      dockerfile: Dockerfile
+    container_name: endowgpt-api
+    ports:
+      - "${PORT:-3080}:${PORT:-3080}"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      rag_api:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      PORT: ${PORT:-3080}
+      NODE_ENV: production
+      APP_TITLE: ${APP_TITLE:-endowGPT}
+      DOMAIN_CLIENT: ${DOMAIN_CLIENT:-http://localhost:3080}
+      DOMAIN_SERVER: ${DOMAIN_SERVER:-http://localhost:3080}
+      CONFIG_PATH: /app/librechat.yaml
+      MONGO_URI: mongodb://mongodb:27017/LibreChat
+      MEILI_HOST: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      SEARCH: ${SEARCH:-true}
+      RAG_API_URL: http://rag_api:${RAG_PORT:-8000}
+      RAG_PORT: ${RAG_PORT:-8000}
+      LIBRECHAT_TEMP_CREDENTIALS_PATH: /app/data/.env.temp
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      CREDS_KEY: ${CREDS_KEY}
+      CREDS_IV: ${CREDS_IV}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      ALLOW_EMAIL_LOGIN: ${ALLOW_EMAIL_LOGIN:-true}
+      ALLOW_SOCIAL_LOGIN: ${ALLOW_SOCIAL_LOGIN:-false}
+      ALLOW_PASSWORD_RESET: ${ALLOW_PASSWORD_RESET:-false}
+      CUSTOM_FOOTER: ${CUSTOM_FOOTER:-}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY}
+      PROXY: ${PROXY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: localhost,127.0.0.1,::1
+    volumes:
+      - ./LibreChat-main/librechat.yaml:/app/librechat.yaml:ro
+      - librechat-data:/app/data
+      - librechat-images:/app/client/public/images
+      - librechat-uploads:/app/uploads
+      - librechat-logs:/app/logs
+      - librechat-skill:/app/skill
+    healthcheck:
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://localhost:' + process.env.PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ----------------------------------------------------------------- mongodb
+  mongodb:
+    <<: *common
+    image: mongo:8.0.20
+    container_name: endowgpt-mongo
+    command: mongod --noauth
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - "CMD"
+        - "mongosh"
+        - "--quiet"
+        - "--eval"
+        - "db.adminCommand('ping').ok"
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ----------------------------------------------------------- meilisearch
+  meilisearch:
+    <<: *common
+    image: getmeili/meilisearch:v1.35.1
+    container_name: endowgpt-meili
+    environment:
+      MEILI_HOST: http://meilisearch:7700
+      MEILI_NO_ANALYTICS: ${MEILI_NO_ANALYTICS:-true}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+    volumes:
+      - meili-data:/meili_data
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - >-
+          curl -fsS http://localhost:7700/health
+          || wget -q --spider http://localhost:7700/health
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ----------------------------------------------------------------- ollama
+  ollama:
+    <<: *common
+    image: ollama/ollama:latest
+    container_name: endowgpt-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "ollama list >/dev/null 2>&1 || ollama --version"
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ------------------------------------------------- one-shot model puller
+  # Pulls the embedding model once so rag_api never boots before embeddings
+  # are available. Compose will run this job to completion on `up`.
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: endowgpt-ollama-init
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull ${EMBEDDINGS_MODEL:-nomic-embed-text}"]
+    volumes:
+      - ollama-data:/root/.ollama
+
+  # ------------------------------------------------------------------ pg db
+  vectordb:
+    <<: *common
+    image: pgvector/pgvector:0.8.0-pg15-trixie
+    container_name: endowgpt-vectordb
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-endowgpt}
+      POSTGRES_USER: ${POSTGRES_USER:-endowgpt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ---------------------------------------------------------------- RAG api
+  rag_api:
+    <<: *common
+    build:
+      context: ./rag-api-main
+      dockerfile: Dockerfile
+    container_name: endowgpt-rag
+    depends_on:
+      vectordb:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    environment:
+      RAG_HOST: 0.0.0.0
+      RAG_PORT: ${RAG_PORT:-8000}
+      RAG_UPLOAD_DIR: /app/uploads/
+      DEBUG_RAG_API: false
+      DB_HOST: vectordb
+      DB_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-endowgpt}
+      POSTGRES_USER: ${POSTGRES_USER:-endowgpt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      VECTOR_DB_TYPE: pgvector
+      EMBEDDINGS_PROVIDER: ollama
+      EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL:-nomic-embed-text}
+      OLLAMA_BASE_URL: http://ollama:11434
+      CHUNK_SIZE: ${CHUNK_SIZE:-1500}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - rag-uploads:/app/uploads
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:' + __import__('os').environ.get('RAG_PORT', '8000') + '/health', timeout=5)"
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 45s
+
+volumes:
+  mongo-data:
+  meili-data:
+  pgdata:
+  ollama-data:
+  librechat-data:
+  librechat-images:
+  librechat-uploads:
+  librechat-logs:
+  librechat-skill:
+  rag-uploads:
