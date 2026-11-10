@@ -1,0 +1,55 @@
+# --- Secrets ---
+.env
+*.env.local
+LibreChat-main/.env
+LibreChat-main/.env.*
+!LibreChat-main/.env.example
+rag-api-main/.env
+rag-api-main/.env.*
+!rag-api-main/.env.example
+
+# --- Legacy plans (not authoritative) ---
+setup-guide.md
+FINAL_REPORT.md
+
+# --- Runtime / data volumes ---
+data-node/
+meili_data*
+pgdata*
+vectors/
+uploads/
+images/
+logs/
+skill/
+LibreChat-main/data-node/
+LibreChat-main/meili_data*/
+LibreChat-main/uploads/
+LibreChat-main/images/
+LibreChat-main/logs/
+LibreChat-main/skill/
+LibreChat-main/client/public/images/*
+!LibreChat-main/client/public/images/.gitkeep
+LibreChat-main/client/public/fonts/
+LibreChat-main/client/public/assets/custom-themes/
+
+# --- Node / build ---
+node_modules/
+dist/
+build/
+coverage/
+LibreChat-main/client/dist/
+LibreChat-main/client/node_modules/
+*.tsbuildinfo
+
+# --- Logs / temp ---
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# --- Editor ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
