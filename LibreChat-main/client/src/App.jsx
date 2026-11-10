@@ -7,6 +7,7 @@ import { Toast, ToastViewport, ToastProvider, useInputModality } from '@librecha
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { FilesHostProvider, appFilesHost } from '~/Providers/FilesHostContext';
 import Direction, { ToastSwipeProvider } from '~/Providers/Direction';
+import LogoSplash from '~/components/Brand/LogoSplash';
 import { ScreenshotProvider, useApiErrorBoundary } from './hooks';
 import WakeLockManager from '~/components/System/WakeLockManager';
 import QueryDevtoolsGate from '~/components/QueryDevtoolsGate';
@@ -54,6 +55,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <LogoSplash />
       <RecoilRoot>
         <LanguageSync />
         <UiScaleSync />

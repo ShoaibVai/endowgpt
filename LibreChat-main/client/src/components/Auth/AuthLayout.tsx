@@ -3,6 +3,7 @@ import { TStartupConfig } from 'librechat-data-provider';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
 import { hasPublishedPolicies } from '~/utils/policies';
 import { TranslationKeys, useLocalize } from '~/hooks';
+import { logoPaths, logoCropStyle } from '~/components/Brand/logos';
 import SocialLoginRender from './SocialLoginRender';
 import { BlinkAnimation } from './BlinkAnimation';
 import LegalConsent from './LegalConsent';
@@ -91,11 +92,24 @@ function AuthLayout({
     <div className="bg-surface-primary relative flex min-h-screen flex-col">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        <div className="mt-6 h-10 w-full bg-cover">
+        <div className="mt-6 flex w-full justify-center px-4">
+          {/* Chromium mis-renders viewBox-cropped variants of this artwork, so the
+              served file keeps its square canvas and this frame applies the band
+              crop via object-fit (constants in components/Brand/logos.ts). */}
           <img
-            src="assets/logo.svg"
-            className="h-full w-full object-contain"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
+            src={logoPaths.lockup('onlight')}
+            style={logoCropStyle}
+            className="dark:hidden max-h-16 w-full max-w-sm"
+            alt={localize('com_ui_logo', {
+              0: startupConfig?.appTitle ?? 'endowGPT',
+            })}
+          />
+          <img
+            src={logoPaths.lockup('ondark')}
+            aria-hidden="true"
+            style={logoCropStyle}
+            className="hidden dark:block max-h-16 w-full max-w-sm"
+            alt=""
           />
         </div>
       </BlinkAnimation>

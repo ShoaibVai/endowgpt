@@ -6,7 +6,7 @@ type InterfaceConfig = NonNullable<AppConfig['interfaceConfig']>;
 
 type PreLoginInterface = Pick<
   InterfaceConfig,
-  'privacyPolicy' | 'termsOfService' | 'buildInfo' | 'theme'
+  'privacyPolicy' | 'termsOfService' | 'buildInfo' | 'theme' | 'logoSplash'
 >;
 
 type PolicyLinks = Pick<InterfaceConfig, 'privacyPolicy' | 'termsOfService'>;
@@ -111,12 +111,16 @@ export function buildPreLoginInterface(
   if (!interfaceConfig) {
     return undefined;
   }
-  const { privacyPolicy, termsOfService, buildInfo, theme } = withSafePolicyLinks(interfaceConfig);
+  const { privacyPolicy, termsOfService, buildInfo, theme, logoSplash } =
+    withSafePolicyLinks(interfaceConfig);
   const selected: PreLoginInterface = {
     ...(privacyPolicy && { privacyPolicy }),
     ...(termsOfService && { termsOfService }),
     ...(buildInfo === false && { buildInfo }),
     ...(theme && { theme }),
+    // Present rather than truthy: `false` is the deployment's own choice and
+    // must reach the pre-login screens, so the splash can stay off at sign-in.
+    ...(logoSplash != null && { logoSplash }),
   };
   return Object.keys(selected).length > 0 ? selected : undefined;
 }

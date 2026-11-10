@@ -56,6 +56,11 @@ const loadProjectWorkspace = () =>
     Component: m.ProjectWorkspace,
   }));
 
+const loadCredits = () =>
+  importWithRecovery(() => import('~/components/Brand/Credits')).then((m) => ({
+    Component: m.default,
+  }));
+
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
@@ -102,6 +107,14 @@ export const router = createBrowserRouter(
     {
       path: 'verify',
       element: <VerifyEmail />,
+      errorElement: <RouteErrorBoundary />,
+    },
+    {
+      /** endowGPT attribution page; reachable signed-out on purpose (the custom
+       *  footer deep-links here as soon as a user lands in any surface that
+       *  shows it). */
+      path: 'credits',
+      lazy: loadCredits,
       errorElement: <RouteErrorBoundary />,
     },
     {

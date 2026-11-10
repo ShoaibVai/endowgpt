@@ -111,6 +111,9 @@ export default defineConfig(({ command }) => ({
           /** `manifest.webmanifest` is not listed: vite-plugin-pwa always appends it as an
            * additional manifest entry, so globbing it too duplicates the precache entry. */
           'assets/maskable-icon.png',
+          'assets/endowgpt-logo-*.svg',
+          'assets/endowgpt-mark*.svg',
+          'assets/logo-reveal.*',
         ],
         globIgnores: [
           'images/**/*',
@@ -155,11 +158,11 @@ export default defineConfig(({ command }) => ({
       },
       includeAssets: [],
       manifest: {
-        name: 'LibreChat',
-        short_name: 'LibreChat',
+        name: 'endowGPT',
+        short_name: 'endowGPT',
         display: 'standalone',
-        background_color: '#000000',
-        theme_color: '#009688',
+        background_color: '#f9f3f4',
+        theme_color: '#534cd6',
         icons: [
           {
             src: 'assets/favicon-32x32.png',
@@ -179,6 +182,11 @@ export default defineConfig(({ command }) => ({
           {
             src: 'assets/icon-192x192.png',
             sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'assets/icon-512x512.png',
+            sizes: '512x512',
             type: 'image/png',
           },
           {

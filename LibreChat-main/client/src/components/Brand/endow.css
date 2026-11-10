@@ -1,0 +1,39 @@
+/*
+endow.css — endowGPT-only CSS. Everything here is genuinely local (splash
+animation timing), not semantic theming: brand colors live in the deployment
+theme (`librechat.yaml`) and components use shared theme tokens elsewhere.
+*/
+
+@keyframes endow-splash-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes endow-splash-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.endow-splash-enter {
+  animation: endow-splash-in 240ms ease-out both;
+}
+
+.endow-splash-exit {
+  animation: endow-splash-out 360ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .endow-splash-enter,
+  .endow-splash-exit {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+}

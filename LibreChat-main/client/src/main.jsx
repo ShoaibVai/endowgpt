@@ -6,6 +6,8 @@ import App from './App';
 import '@librechat/client/style.css';
 import './style.css';
 import './mobile.css';
+// endowGPT-only additions (splash animation timing); imported last on purpose
+import './components/Brand/endow.css';
 import { ApiErrorBoundaryProvider } from './hooks/ApiErrorBoundaryContext';
 import { clearTTSCache } from './utils/ttscache';
 import 'katex/dist/katex.min.css';

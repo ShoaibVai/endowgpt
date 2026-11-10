@@ -53,3 +53,4 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 *.swp
+scripts/.brand-derived/

@@ -2433,8 +2433,7 @@ export const VERTEX_REGION_PATTERN = /^[A-Za-z0-9-]+$/;
  */
 export const VERTEX_PATH_SEGMENT_PATTERN = /^(?!\.+$)[A-Za-z0-9._:@-]+$/;
 
-/**
- * A whole `${VAR}` reference to one environment variable: a name of letters, digits and
+/** A whole `${VAR}` reference to one environment variable: a name of letters, digits and
  * underscores, with nothing around it. Text that only starts with `${` and ends with `}`
  * (`${A}/x#${A}`) is not one.
  */
@@ -3124,6 +3123,10 @@ export const interfaceSchema = z
       .optional(),
     termsOfService: termsOfServiceSchema.optional(),
     customWelcome: z.string().optional(),
+    /** Plays the deployment's logo reveal animation once per browser session on
+     *  first load. The reveal is skipped gracefully for `prefers-reduced-motion`
+     *  (a static logo shows instead) and when visiting again in the session. */
+    logoSplash: z.boolean().optional(),
     /** What heads the welcome screen when an agent, assistant or branded spec is
      *  selected: its name (`entity`), or the time-of-day greeting with the user's
      *  name (`greeting`) for deployments whose header selector already names it. */
@@ -4442,6 +4445,23 @@ export const toolCallPreviewsConfigSchema = z.object({
 
 export type TToolCallPreviewsConfig = z.infer<typeof toolCallPreviewsConfigSchema>;
 
+/**
+ * endowGPT document editor limits. Everything defaults to the shipped values so a
+ * deployment that does not name this block keeps today's behavior.
+ */
+export const documentsConfigSchema = z.object({
+  /** Largest selected text sent to the model for one inline replacement. */
+  aiEditMaxChars: z.number().int().min(100).max(500_000).default(20_000),
+  /** Maximum text length accepted for imports (file-to-document editing). */
+  importMaxChars: z.number().int().min(1_000).max(2_000_000).default(200_000),
+  /** Version snapshots kept per document; the oldest is pruned beyond it. */
+  versionHistoryCap: z.number().int().min(3).max(500).default(50),
+  /** Client autosave debounce in milliseconds. */
+  autosaveDelayMs: z.number().int().min(200).max(10_000).default(800),
+});
+
+export type TDocumentsConfig = z.infer<typeof documentsConfigSchema>;
+
 export const configSchema = z.object({
   version: z.string(),
   telemetry: telemetrySchema.optional(),
@@ -4719,6 +4739,8 @@ export const configSchema = z.object({
     .optional(),
   concurrency: lookupConcurrencySchema.optional(),
   fileConfig: fileConfigSchema.optional(),
+  /** endowGPT document editor (artifact `document` type) and AI selection-edit limits. */
+  documents: documentsConfigSchema.optional(),
   modelSpecs: specsConfigSchema.optional(),
   filters: filtersConfigSchema.optional(),
   messageFilter: messageFilterSchema.optional(),
