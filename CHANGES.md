@@ -110,6 +110,8 @@ theme tokens, copy via `useLocalize()`).
 - **M2** — brand pipelines + assets, config levers (`interface.logoSplash`,
   `documents` block), splash component + App mount, theme-aware login logo,
   `/credits` page, PWA manifest + shell branding, client dependency additions.
-- **M3 (in progress)** — `application/vnd.endowgpt.document` artifact type
-  (MIME, aliases, row kind, dispatch), document prompt guidance, and the
-  TipTap editor surface wired into the artifact panel.
+- **M3+M4** — `application/vnd.endowgpt.document` end to end: client MIME +
+  dispatch + TipTap editor (markdown bridge, serialized autosave, toolbar),
+  shared data-provider surface, Mongo storage with version snapshots and
+  restore, `packages/api` documents router + aiEdit provider call, prompt
+  guidance, React Query hooks, markdown round-trip tests, smoke script.
