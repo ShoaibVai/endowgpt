@@ -9,17 +9,6 @@ import { Mark, mergeAttributes } from '@tiptap/core';
  * suggestion never touches document structure.
  */
 
-declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    endowSuggestion: {
-      /** Wrap the current selection in the named suggestion mark. */
-      setEndowSuggestion: (kind: 'insert' | 'delete') => ReturnType;
-      /** Strip every suggestion mark in the document (keeps insert content). */
-      clearEndowSuggestions: () => ReturnType;
-    };
-  }
-}
-
 const colors = {
   insert: {
     class: 'endow-suggestion-insert',
@@ -47,37 +36,6 @@ function createSuggestionMark(kind: 'insert' | 'delete') {
           'data-endow-suggestion': kind,
         }),
       ];
-    },
-    addCommands() {
-      return {
-        setEndowSuggestion:
-          () =>
-          ({ commands }) =>
-            commands.setMark(this.name),
-        clearEndowSuggestions:
-          () =>
-          ({ tr, state }) => {
-            const types = [
-              state.schema.marks.endowInsert,
-              state.schema.marks.endowDelete,
-            ].filter(Boolean);
-            if (types.length === 0) {
-              return false;
-            }
-            state.doc.descendants((node, pos) => {
-              if (!node.isText) {
-                return true;
-              }
-              for (const type of types) {
-                if (node.marks.some((mark) => mark.type === type)) {
-                  tr.removeMark(pos, pos + node.nodeSize, type);
-                }
-              }
-              return true;
-            });
-            return true;
-          },
-      };
     },
   });
 }

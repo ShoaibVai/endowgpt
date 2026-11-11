@@ -79,7 +79,9 @@ and its RAG API.
 | Model smoke (both models, direct to OpenCode) | SKIP — key authenticated, but the upstream free-tier usage quota is exhausted (HTTP 429 `FreeUsageLimitError`, ~18h reset). The wiring itself is proven by the auth pass and the app's mapped error. |
 | Client typecheck (`tsc --noEmit`) | PASS (0 errors in touched code) |
 | API/data-schemas typecheck | PASS (0 errors in touched code; pre-existing upstream spec-file noise untouched) |
-| Jest: markdown round-trip (13), word diff (5), ArtifactTabs (9) | PASS |
+| Jest: markdown round-trip (13), word diff (5), suggestion accept/reject (4), ArtifactTabs (9) | PASS |
+| Jest + mongodb-memory-server: document storage contract (snapshots, conflict, cap pruning, restore appends, scoping) — 10 cases | PASS |
+| Jest: `/api/documents` router contract (auth, validation, 409 mapping, allow-list, caps, 429 budget, coded provider failures) + `/ai-edit` provider mapping — 28 cases | PASS |
 | Client production build (`npm run build:client`) | PASS |
 
 ## Known limitations / notes
@@ -100,6 +102,13 @@ and its RAG API.
    replica; multi-replica setups need the shared stream store instead.
 6. **Pre-existing upstream typecheck noise** in untouched spec files
    (implicit-any in tests) was left as-is to keep the diff surface minimal.
+7. **Suggestion mark commands removed** — while adding the M7 tests, both
+   suggestion marks were found registering a command under the same name
+   (`setEndowSuggestion`), where the `endowDelete` registration silently won.
+   Production applies marks through raw transactions, so rendering was never
+   affected; the dead command surface was removed rather than kept broken.
+   Accept/reject now also preserves formatting a user adds on top of a
+   pending suggestion (only the suggestion marks are stripped).
 
 ## Where things live
 

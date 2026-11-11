@@ -65,7 +65,9 @@ function rebuildRange(
     if (!wanted) {
       return true;
     }
-    const marks = node.marks.filter((mark) => !hasSuggestionMarks(node, [INSERT, DELETE]));
+    // Strip only the suggestion marks; formatting that rode along (bold, …)
+    // stays on the kept text.
+    const marks = node.marks.filter((mark) => ![INSERT, DELETE].includes(mark.type.name));
     kept.push(state.schema.text(node.textContent, marks));
     return true;
   });

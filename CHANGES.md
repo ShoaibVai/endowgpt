@@ -105,8 +105,10 @@ theme tokens, copy via `useLocalize()`).
 
 ## Core edits (rag-api upstream)
 
-(none yet; M6 planned) — expected: none required, since environment wiring in
-`docker-compose.yml` is sufficient.
+(none) — M6 verification found no rag-api changes necessary: the stack runs on
+environment wiring in `docker-compose.yml` (`EMBEDDINGS_PROVIDER=ollama`,
+`OLLAMA_BASE_URL`, pgvector connection) and the stock retrieval endpoints;
+LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
 
 ## Motion log
 
@@ -120,13 +122,7 @@ theme tokens, copy via `useLocalize()`).
   shared data-provider surface, Mongo storage with version snapshots and
   restore, `packages/api` documents router + aiEdit provider call, prompt
   guidance, React Query hooks, markdown round-trip tests, smoke script.
-- **M5+M6** — AI selection edits (BubbleMenu, word-diff marks, accept/reject,
-  per-user hourly limiter), versions drawer with restore, DOCX/PDF/rich-copy
-  exports, `/documents` pages, file-to-document import, `librechat.yaml`
-  tracked in git, live stack booted: Mongo/Meili/pgvector/Ollama/RAG/API all
-  healthy; authenticated probes verified upsert/conflict/restore/ai-edit
-  mapping; boot smoke green (model calls skip on the key's free-tier quota).
-- **M5** - selection edits and history: floating TipTap BubbleMenu with
+- **M5** — selection edits and history: floating TipTap BubbleMenu with
   Rewrite/Expand/Shorten/Fix grammar/Translate, a Professional/Casual/
   Persuasive tone submenu, and an inline "Ask AI…" instruction; suggestions
   apply as `endowInsert`/`endowDelete` diffs with accept/reject; async results
@@ -135,3 +131,24 @@ theme tokens, copy via `useLocalize()`).
   `documents.aiEditMaxChars`, config-driven autosave, store-seeded conflict
   tokens, and restore that advances the version token and refreshes the chat
   artifact. `/documents` index + full-page editor routes.
+- **M6** — RAG and import: stack verified live (Mongo/Meili/pgvector/Ollama/
+  RAG/API all healthy; `ollama-init` gates `rag_api` on the pulled embedding
+  model), authenticated probes verified upsert/conflict/restore/ai-edit
+  mapping, boot smoke green with model calls skipping on the key's free-tier
+  quota, file search through the `fileSearch` capability with the upstream
+  citations UI, and an "Edit this document" action on `FilePreviewDialog` that
+  imports extracted file text into a store-backed document. No rag-api core
+  edits were needed.
+- **M7** — tests, docs, report: storage contract tests (`document.spec.ts`,
+  10 cases with `mongodb-memory-server`: snapshots, conflict, cap pruning,
+  restore appends, tenant scoping), HTTP contract tests for the documents
+  router (`routes.spec.ts`) and the provider call (`aiEdit.spec.ts`, 28 cases:
+  auth, validation, 409 mapping, allow-list, caps, 429 budget, coded provider
+  failures), and component tests for suggestion accept/reject (4 cases on a
+  real TipTap editor). Two latent bugs found and fixed while writing those
+  tests: both suggestion marks registered a command named `setEndowSuggestion`
+  (the delete registration won and always applied `endowDelete` — the dead,
+  unused command surface was removed), and accept/reject stripped formatting
+  that rode along with suggestion spans (now only the suggestion marks are
+  stripped). Final report in `REPORT.md`; branding sweep and README ops guide
+  finished.
