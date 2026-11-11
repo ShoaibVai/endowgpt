@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BubbleMenu } from '@tiptap/react';
 import { Button, useToastContext } from '@librechat/client';
-import { Check, Languages, Sparkles, SpellCheck, X } from 'lucide-react';
-import type { Editor } from '@tiptap/core';
-import { useAiEditDocumentMutation } from '~/data-provider';
+import { ChevronDown, Languages, Sparkles, SpellCheck, X } from 'lucide-react';
 import type { TAiEditRequest } from 'librechat-data-provider';
-import { useLocalize } from '~/hooks';
+import type { Editor } from '@tiptap/core';
+import type { ReactNode } from 'react';
 import { compactSpans, isMeaningfulDiff, wordDiff, type DiffSpan } from './diff';
+import { useAiEditDocumentMutation } from '~/data-provider';
+import { useLocalize } from '~/hooks';
 import './suggestion.css';
 
 /** Inline AI selection edits (PLAN.md §7.1): each action sends the exact
@@ -16,52 +18,81 @@ import './suggestion.css';
 export interface SelectionActionsProps {
   editor: Editor;
   model: string;
+  /** Selection cap resolved from `startupConfig.documents.aiEditMaxChars`. */
+  maxChars?: number;
 }
+
+type SelectionSnapshot = {
+  from: number;
+  to: number;
+  text: string;
+};
 
 const ACTIONS: Array<{
   mode: TAiEditRequest['mode'];
   labelKey: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }> = [
-  { mode: 'improve', labelKey: 'com_ui_selection_improve', icon: <Sparkles className="size-4" /> },
-  { mode: 'shorten', labelKey: 'com_ui_selection_shorten', icon: <X className="size-4" /> },
-  { mode: 'expand', labelKey: 'com_ui_selection_expand', icon: <Sparkles className="size-4" /> },
-  { mode: 'fix_grammar', labelKey: 'com_ui_selection_fix_grammar', icon: <SpellCheck className="size-4" /> },
-  { mode: 'translate', labelKey: 'com_ui_selection_translate', icon: <Languages className="size-4" /> },
-  { mode: 'tone', labelKey: 'com_ui_selection_tone', icon: <Languages className="size-4" /> },
+  {
+    mode: 'improve',
+    labelKey: 'com_ui_selection_rewrite',
+    icon: <Sparkles className="size-3.5" />,
+  },
+  { mode: 'expand', labelKey: 'com_ui_selection_expand', icon: <Sparkles className="size-3.5" /> },
+  { mode: 'shorten', labelKey: 'com_ui_selection_shorten', icon: <X className="size-3.5" /> },
+  {
+    mode: 'fix_grammar',
+    labelKey: 'com_ui_selection_fix_grammar',
+    icon: <SpellCheck className="size-3.5" />,
+  },
+  {
+    mode: 'translate',
+    labelKey: 'com_ui_selection_translate',
+    icon: <Languages className="size-3.5" />,
+  },
 ];
 
-export default function SelectionActions({ editor, model }: SelectionActionsProps) {
+const TONES = [
+  { value: 'Professional', labelKey: 'com_ui_selection_tone_professional' },
+  { value: 'Casual', labelKey: 'com_ui_selection_tone_casual' },
+  { value: 'Persuasive', labelKey: 'com_ui_selection_tone_persuasive' },
+];
+
+const AI_EDIT_ERROR_KEYS: Record<string, string> = {
+  ai_edit_rate_limited: 'com_ai_edit_error_rate_limited',
+  ai_edit_auth: 'com_ai_edit_error_auth',
+  ai_edit_selection_too_large: 'com_ai_edit_selection_too_large',
+};
+
+export default function SelectionActions({ editor, model, maxChars }: SelectionActionsProps) {
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const aiEdit = useAiEditDocumentMutation();
-  const [hasSelection, setHasSelection] = useState(false);
-  const [isSingleLine, setIsSingleLine] = useState(true);
+  const [toneOpen, setToneOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+  const [toneSnapshot, setToneSnapshot] = useState<SelectionSnapshot | null>(null);
+  const [customSnapshot, setCustomSnapshot] = useState<SelectionSnapshot | null>(null);
+  const customInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const refresh = () => {
-      const { from, to, empty } = editor.state.selection;
-      const hasText = !empty && editor.state.doc.textBetween(from, to, '\n').trim().length > 0;
-      setHasSelection(hasText);
-      // Suggestions are inline: a selection spanning paragraphs would need a
-      // block-level rebuild, so multi-block ranges stay out of scope here.
-      const $from = editor.state.selection.$from;
-      const $to = editor.state.selection.$to;
-      setIsSingleLine($from.sameParent($to));
-    };
-    editor.on('selectionUpdate', refresh);
-    editor.on('transaction', refresh);
-    refresh();
-    return () => {
-      editor.off('selectionUpdate', refresh);
-      editor.off('transaction', refresh);
-    };
+    if (customOpen) {
+      customInputRef.current?.focus();
+    }
+  }, [customOpen]);
+
+  const snapshotSelection = useCallback((): SelectionSnapshot | null => {
+    const { from, to } = editor.state.selection;
+    const text = editor.state.doc.textBetween(from, to, '\n');
+    if (!text.trim()) {
+      return null;
+    }
+    return { from, to, text };
   }, [editor]);
 
   const applySuggestion = useCallback(
-    (originalText: string, suggestedText: string) => {
-      const { from, to } = editor.state.selection;
-      const spans = compactSpans(wordDiff(originalText, suggestedText)) as DiffSpan[];
+    (selection: SelectionSnapshot, suggestedText: string) => {
+      const spans = compactSpans(wordDiff(selection.text, suggestedText)) as DiffSpan[];
       const insertType = editor.state.schema.marks.endowInsert;
       const deleteType = editor.state.schema.marks.endowDelete;
       const nodes = spans.map((span) => {
@@ -73,7 +104,7 @@ export default function SelectionActions({ editor, model }: SelectionActionsProp
         }
         return editor.state.schema.text(span.text);
       });
-      const tr = editor.state.tr.replaceWith(from, to, nodes);
+      const tr = editor.state.tr.replaceWith(selection.from, selection.to, nodes);
       editor.view.dispatch(tr);
       editor.commands.focus();
     },
@@ -85,82 +116,198 @@ export default function SelectionActions({ editor, model }: SelectionActionsProp
       mode: TAiEditRequest['mode'],
       instruction: string,
       extras: { language?: string; tone?: string } = {},
+      snapshot?: SelectionSnapshot | null,
     ) => {
-      const { from, to } = editor.state.selection;
-      const text = editor.state.doc.textBetween(from, to, '\n');
-      if (!text.trim()) {
+      const selection = snapshot ?? snapshotSelection();
+      if (selection == null) {
         return;
       }
+      if (maxChars != null && selection.text.length > maxChars) {
+        showToast({ status: 'info', message: localize('com_ai_edit_selection_too_large') });
+        return;
+      }
+      setToneOpen(false);
+      setCustomOpen(false);
+      setCustomValue('');
       try {
         const result = await aiEdit.mutateAsync({
-          text,
+          text: selection.text,
           instruction,
           model,
           mode,
           ...extras,
         });
-        if (!isMeaningfulDiff(text, result.text)) {
+        /* The request is async: the user may have moved on before it lands.
+         * Only apply the replacement over the exact text it was generated for. */
+        const current = editor.state.doc.textBetween(selection.from, selection.to, '\n');
+        if (current !== selection.text) {
+          showToast({ status: 'info', message: localize('com_ai_edit_selection_changed') });
+          return;
+        }
+        if (!isMeaningfulDiff(selection.text, result.text)) {
           showToast({ status: 'info', message: localize('com_ai_edit_failed') });
           return;
         }
-        applySuggestion(text, result.text);
+        applySuggestion(selection, result.text);
       } catch {
         const code = (aiEdit.error as { response?: { data?: { error?: string } } })?.response?.data
           ?.error;
-        const key =
-          code === 'ai_edit_rate_limited'
-            ? 'com_ai_edit_error_rate_limited'
-            : code === 'ai_edit_auth'
-              ? 'com_ai_edit_error_auth'
-              : 'com_ai_edit_error_unavailable';
-        showToast({ status: 'error', message: localize(key) });
+        const key = AI_EDIT_ERROR_KEYS[code ?? ''] ?? 'com_ai_edit_error_unavailable';
+        showToast({ status: 'error', message: localize(key as never) });
       }
     },
-    [aiEdit, applySuggestion, editor, localize, model, showToast],
+    [aiEdit, applySuggestion, editor, localize, maxChars, model, showToast, snapshotSelection],
   );
 
-  if (!hasSelection || !isSingleLine) {
-    return null;
-  }
+  const shouldShow = useCallback(({ editor: current }: { editor: Editor }) => {
+    if (!current.isEditable) {
+      return false;
+    }
+    const { from, to, empty } = current.state.selection;
+    if (empty || !current.state.doc.textBetween(from, to, '\n').trim()) {
+      return false;
+    }
+    /* A suggestion replaces one inline range; a selection spanning
+     * paragraphs would need a block-level rebuild. */
+    return current.state.selection.$from.sameParent(current.state.selection.$to);
+  }, []);
+
+  const submitCustom = useCallback(() => {
+    const instruction = customValue.trim();
+    if (!instruction) {
+      return;
+    }
+    void runAction('custom', instruction, {}, customSnapshot);
+  }, [customSnapshot, customValue, runAction]);
 
   return (
-    <div
-      className="border-border-light flex flex-wrap items-center gap-0.5 border-t px-2 py-1"
-      data-testid="endow-selection-actions"
+    <BubbleMenu
+      editor={editor}
+      tippyOptions={{ duration: 100, placement: 'top' }}
+      shouldShow={shouldShow}
     >
-      {ACTIONS.map(({ mode, labelKey, icon }) => (
-        <Button
-          key={mode}
-          size="sm"
-          variant="ghost"
-          disabled={aiEdit.isLoading}
-          onClick={() =>
-            runAction(
-              mode,
-              localize(labelKey as never),
-              mode === 'translate' ? { language: 'English' } : {},
-            )
-          }
-          className="h-7 gap-1.5 px-2 text-xs"
-        >
-          {icon}
-          {localize(labelKey as never)}
-        </Button>
-      ))}
-      <Button
-        size="sm"
-        variant="ghost"
-        disabled={aiEdit.isLoading}
-        onClick={() => {
-          const instruction = window.prompt(localize('com_ui_selection_custom')) ?? '';
-          if (instruction.trim()) {
-            void runAction('custom', instruction);
-          }
-        }}
-        className="h-7 px-2 text-xs"
+      <div
+        className="border-border-light bg-surface-primary-alt text-text-primary flex flex-col gap-1 rounded-lg border p-1 shadow-lg"
+        data-testid="endow-selection-actions"
       >
-        {localize('com_ui_selection_custom')}
-      </Button>
-    </div>
+        <div
+          className="flex flex-wrap items-center gap-0.5"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {ACTIONS.map(({ mode, labelKey, icon }) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant="ghost"
+              disabled={aiEdit.isLoading}
+              onClick={() =>
+                void runAction(
+                  mode,
+                  localize(labelKey as never),
+                  mode === 'translate' ? { language: 'English' } : {},
+                )
+              }
+            >
+              <span className="flex items-center gap-1">
+                {icon}
+                {localize(labelKey as never)}
+              </span>
+            </Button>
+          ))}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={aiEdit.isLoading}
+            aria-haspopup="menu"
+            aria-expanded={toneOpen}
+            onClick={() => {
+              setToneSnapshot(snapshotSelection());
+              setToneOpen((open) => !open);
+              setCustomOpen(false);
+            }}
+          >
+            <span className="flex items-center gap-1">
+              {localize('com_ui_selection_tone')}
+              <ChevronDown className="size-3" aria-hidden="true" />
+            </span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={aiEdit.isLoading}
+            onClick={() => {
+              setCustomSnapshot(snapshotSelection());
+              setCustomOpen((open) => !open);
+              setToneOpen(false);
+            }}
+          >
+            {localize('com_ui_selection_ask_ai')}
+          </Button>
+        </div>
+
+        {toneOpen && (
+          <div
+            className="border-border-light flex flex-wrap items-center gap-0.5 border-t pt-1"
+            role="menu"
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            {TONES.map(({ value, labelKey }) => (
+              <Button
+                key={value}
+                size="sm"
+                variant="ghost"
+                role="menuitem"
+                disabled={aiEdit.isLoading}
+                onClick={() =>
+                  void runAction(
+                    'tone',
+                    localize('com_ui_selection_tone_instruction', {
+                      tone: localize(labelKey as never),
+                    }),
+                    { tone: value },
+                    toneSnapshot,
+                  )
+                }
+              >
+                {localize(labelKey as never)}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {customOpen && (
+          <form
+            className="border-border-light flex items-center gap-1 border-t pt-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitCustom();
+            }}
+          >
+            <input
+              ref={customInputRef}
+              value={customValue}
+              onChange={(event) => setCustomValue(event.target.value)}
+              placeholder={localize('com_ui_selection_ai_placeholder')}
+              aria-label={localize('com_ui_selection_ai_placeholder')}
+              className="border-border-light bg-surface-primary text-text-primary h-7 min-w-56 grow rounded-md border px-2 text-xs outline-none"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setCustomOpen(false);
+                  setCustomValue('');
+                }
+              }}
+            />
+            <Button
+              type="submit"
+              size="sm"
+              variant="submit"
+              disabled={aiEdit.isLoading || !customValue.trim()}
+            >
+              {localize('com_ui_selection_ai_run')}
+            </Button>
+          </form>
+        )}
+      </div>
+    </BubbleMenu>
   );
 }

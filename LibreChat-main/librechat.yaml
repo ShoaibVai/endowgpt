@@ -1,0 +1,173 @@
+# =============================================================================
+# endowGPT — deployment configuration (librechat.yaml)
+# =============================================================================
+# Loaded by the API container at /app/librechat.yaml (see docker-compose.yml).
+# Secrets are referenced as ${ENV_VAR} and resolved from the environment;
+# **no credentials belong in this file.**
+#
+# Docs: https://librechat.ai/docs/configuration/librechat_yaml
+# =============================================================================
+
+version: 1.4.0
+
+cache: true
+
+fileStrategy: "local"
+
+# -----------------------------------------------------------------------------
+# Default capabilities
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Registration defaults live partly in env (ALLOW_REGISTRATION). Keep
+# socialLogins empty - email/password only.
+# -----------------------------------------------------------------------------
+registration:
+  socialLogins: []
+
+# -----------------------------------------------------------------------------
+# Inference: a single OpenAI-compatible endpoint secured by OPENCODE_API_KEY.
+# -----------------------------------------------------------------------------
+endpoints:
+  custom:
+    - name: "endowGPT"
+      apiKey: "${OPENCODE_API_KEY}"
+      baseURL: "https://opencode.ai/zen/v1"
+      models:
+        default:
+          - "deepseek-v4.1-flash-free"
+          - "glm-5.3-flash-free"
+        # The catalog is a fixed, self-hosted allow-list; do not fetch upstream.
+        fetch: false
+      # Cheap headline model keeps chat responses focused on the real request.
+      titleConvo: true
+      titleMethod: "completion"
+      titleModel: "glm-5.3-flash-free"
+      titleMessageRole: "user"
+      modelDisplayLabel: "endowGPT"
+      iconURL: "/assets/endowgpt-mark.svg"
+
+# -----------------------------------------------------------------------------
+# Model specs: the user-facing labels + per-model capabilities.
+#   `artifacts: true`  -> artifact panel and document prompts
+#   `fileSearch: true` -> ephemeral agent gets file-search (RAG) tooling
+# -----------------------------------------------------------------------------
+modelSpecs:
+  enforce: true
+  list:
+    - name: "deepseek-v4.1-flash-free"
+      label: "endowGPT Fast (DeepSeek)"
+      description: "Fastest everyday chat, editing, and document drafting."
+      preset:
+        endpoint: "endowGPT"
+        model: "deepseek-v4.1-flash-free"
+      default: true
+      order: 1
+      showOnLanding: true
+      conversation_starters:
+        - "Draft a document"
+        - "Build an interactive page"
+        - "Summarize a file"
+      artifacts: true
+      fileSearch: true
+
+    - name: "glm-5.3-flash-free"
+      label: "endowGPT Flash (GLM)"
+      description: "Quick short-form answers, summaries, and routing."
+      preset:
+        endpoint: "endowGPT"
+        model: "glm-5.3-flash-free"
+      order: 2
+      showOnLanding: true
+      conversation_starters:
+        - "Draft a document"
+        - "Build an interactive page"
+        - "Summarize a file"
+      artifacts: true
+      fileSearch: true
+
+# -----------------------------------------------------------------------------
+# Interface / branding
+# -----------------------------------------------------------------------------
+interface:
+  customWelcome: >-
+    What can I help you build today?
+
+    Draft a document, explore an idea, or drop in a file — endowGPT is on it.
+  landingHeading: "entity"
+  landingFooter: true
+  logoSplash: true
+  # Brand the artifact surface, keep the pane in the room.
+  artifactUndocking: true
+  # Allow file search + citations everywhere.
+  fileSearch: true
+  fileCitations: true
+  # Deployment theme: inline definitions use the shared token vocabulary
+  # (`THEME_TOKENS`). The colors below restyle the shell around endowGPT's
+  # palette; anything omitted falls back to LibreChat defaults.
+  # Palette: indigo 534cd6 · teal 24d5d0 · blue 6fbde0 · olive 9eab67
+  #          yellow e1e366 · off-white f9f3f4 · gray b4b4b4 · red f1352a
+  theme:
+    version: 1
+    name: "endowGPT"
+    modes:
+      light:
+        colors:
+          rgb-accent-primary: "83 76 214"             # indigo
+          rgb-accent-primary-hover: "66 60 180"       # deeper indigo
+          rgb-ring-primary: "36 213 208"              # teal
+          rgb-focus-outline: "36 213 208"
+          rgb-focus-control: "36 213 208"
+          rgb-button-primary: "83 76 214"
+          rgb-button-primary-hover: "66 60 180"
+          rgb-link: "83 76 214"
+          rgb-link-hover: "66 60 180"
+          rgb-link-visited: "120 114 214"
+          rgb-header-primary: "249 243 244"           # off-white
+          rgb-surface-sidebar: "249 243 244"
+          rgb-surface-canvas: "255 255 255"
+          rgb-surface-chat: "255 255 255"
+          rgb-surface-composer: "255 255 255"
+          rgb-surface-card: "255 255 255"
+          rgb-border-light: "232 225 227"
+          rgb-border-medium: "180 180 180"            # brand gray
+          rgb-surface-nav-selected: "228 226 252"
+          rgb-surface-tab-selected: "228 226 252"
+          rgb-illustration-subtle: "111 189 224"      # brand blue
+      dark:
+        colors:
+          rgb-accent-primary: "107 100 240"           # brighter indigo on dark
+          rgb-accent-primary-hover: "128 122 244"
+          rgb-ring-primary: "36 213 208"              # teal
+          rgb-focus-outline: "36 213 208"
+          rgb-focus-control: "36 213 208"
+          rgb-button-primary: "107 100 240"
+          rgb-button-primary-hover: "128 122 244"
+          rgb-link: "111 189 224"                     # brand blue
+          rgb-link-hover: "152 205 232"
+          rgb-link-visited: "158 171 103"             # brand olive
+          rgb-header-primary: "16 18 22"
+          rgb-surface-sidebar: "21 23 28"
+          rgb-surface-canvas: "16 18 22"
+          rgb-surface-chat: "23 25 30"
+          rgb-surface-composer: "23 25 30"
+          rgb-surface-card: "23 25 30"
+          rgb-border-light: "44 47 55"
+          rgb-border-medium: "60 64 74"
+          rgb-surface-nav-selected: "38 38 68"
+          rgb-surface-tab-selected: "38 38 68"
+          rgb-illustration-subtle: "36 213 208"
+
+# Speech synthesis/stt are left at LibreChat defaults for this deployment.
+# -----------------------------------------------------------------------------
+# Documents (endowGPT artifact editor limits)
+# These mirror defaults in packages/data-provider/src/config.ts; the block is
+# what lets a deployment retune the editor without a rebuild.
+# -----------------------------------------------------------------------------
+documents:
+  aiEditMaxChars: 20000
+  aiEditMaxPerHour: 30
+  allowedAiEditModels:
+    - "deepseek-v4.1-flash-free"
+    - "glm-5.3-flash-free"
+  versionHistoryCap: 50
+  autosaveDelayMs: 800

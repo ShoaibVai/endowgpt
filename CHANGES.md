@@ -73,6 +73,12 @@ theme tokens, copy via `useLocalize()`).
 | `client/src/components/Artifacts/Document/markdown.ts` | M4 | marked ↔ turndown Markdown bridge |
 | `client/src/components/Artifacts/Document/exporters.ts` | M4 | DOCX/PDF/rich-copy exports (client-side) |
 | `client/src/components/Artifacts/Document/tiptapMarks.ts` | M5 | `endowInsert`/`endowDelete` TipTap marks for inline diffs |
+| `client/src/components/Artifacts/Document/aiSelection.tsx` | M5 | floating selection toolbar: rewrite/expand/shorten/grammar/translate, tone submenu, inline Ask AI instruction |
+| `client/src/components/Artifacts/Document/diff.ts` | M5 | word-level diff + meaningful-change guard (unit-tested) |
+| `client/src/components/Artifacts/Document/suggestionActions.ts` | M5 | accept/reject rebuild of the marked range in one transaction |
+| `client/src/components/Artifacts/Document/suggestion.css` | M5 | insert/delete mark presentation only |
+| `client/src/components/Artifacts/Document/DocumentPage.tsx` | M5 | `/documents/:conversationId/:artifactId` full-page editor |
+| `client/src/components/Artifacts/Document/DocumentsList.tsx` | M5 | `/documents` index of store-backed documents |
 | `client/src/components/Artifacts/Document/store.ts` | M5 | feature-owned Jotai atoms (pending suggestion, versions) |
 | `client/src/components/Artifacts/Document/document.css` | M4 | editor-local markdown metrics + suggestion mark styling |
 | `client/src/components/Artifacts/Document/versions.tsx` | M5 | history drawer, preview, restore |
@@ -110,8 +116,17 @@ theme tokens, copy via `useLocalize()`).
 - **M2** — brand pipelines + assets, config levers (`interface.logoSplash`,
   `documents` block), splash component + App mount, theme-aware login logo,
   `/credits` page, PWA manifest + shell branding, client dependency additions.
-- **M3+M4** — `application/vnd.endowgpt.document` end to end: client MIME +
+- **M3+M4** - `application/vnd.endowgpt.document` end to end: client MIME +
   dispatch + TipTap editor (markdown bridge, serialized autosave, toolbar),
   shared data-provider surface, Mongo storage with version snapshots and
   restore, `packages/api` documents router + aiEdit provider call, prompt
   guidance, React Query hooks, markdown round-trip tests, smoke script.
+- **M5** - selection edits and history: floating TipTap BubbleMenu with
+  Rewrite/Expand/Shorten/Fix grammar/Translate, a Professional/Casual/
+  Persuasive tone submenu, and an inline "Ask AI…" instruction; suggestions
+  apply as `endowInsert`/`endowDelete` diffs with accept/reject; async results
+  only apply when the captured selection is unchanged. Adds per-user hourly
+  rate limiting (`documents.aiEditMaxPerHour`) and the selection cap from
+  `documents.aiEditMaxChars`, config-driven autosave, store-seeded conflict
+  tokens, and restore that advances the version token and refreshes the chat
+  artifact. `/documents` index + full-page editor routes.

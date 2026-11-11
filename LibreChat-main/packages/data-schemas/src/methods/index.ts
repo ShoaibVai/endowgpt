@@ -1,6 +1,7 @@
+import type { DocumentMethods } from './document';
 import { createSubagentContentMethods, type SubagentContentMethods } from './subagentContent';
 import { createDocumentMethods } from './document';
-import type { DocumentMethods } from './document';
+export type { DocumentMethods } from './document';
 export type {
   SubagentContentScope,
   SubagentContentHead,

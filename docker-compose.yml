@@ -50,6 +50,8 @@ services:
       ALLOW_SOCIAL_LOGIN: ${ALLOW_SOCIAL_LOGIN:-false}
       ALLOW_PASSWORD_RESET: ${ALLOW_PASSWORD_RESET:-false}
       CUSTOM_FOOTER: ${CUSTOM_FOOTER:-}
+      # One-replica deployment: assert it so the scheduler arms itself.
+      SCHEDULES_SINGLE_PROCESS: ${SCHEDULES_SINGLE_PROCESS:-true}
       OPENCODE_API_KEY: ${OPENCODE_API_KEY}
       PROXY: ${PROXY:-}
       HTTP_PROXY: ${HTTP_PROXY:-}

@@ -370,6 +370,7 @@ New `configSchema` levers (all settable in `librechat.yaml`, defaults reproduce 
 ```yaml
 documents:
   aiEditMaxChars: 20000        # max selected text sent to the model
+  aiEditMaxPerHour: 30         # inline edits allowed per user per hour
   versionHistoryCap: 50        # version snapshots per document
   autosaveDelayMs: 800         # client autosave debounce
   allowedAiEditModels: [deepseek-v4.1-flash-free, glm-5.3-flash-free]

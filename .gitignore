@@ -8,6 +8,21 @@ rag-api-main/.env
 rag-api-main/.env.*
 !rag-api-main/.env.example
 
+# --- Secrets ---
+.env
+*.env.local
+LibreChat-main/.env
+LibreChat-main/.env.*
+!LibreChat-main/.env.example
+rag-api-main/.env
+rag-api-main/.env.*
+!rag-api-main/.env.example
+
+# endowGPT ships its deployment config; the nested upstream .gitignore
+# ignores these names, and the negation must live in the same file to win.
+!LibreChat-main/librechat.yaml
+!LibreChat-main/librechat.yml
+
 # --- Legacy plans (not authoritative) ---
 setup-guide.md
 FINAL_REPORT.md

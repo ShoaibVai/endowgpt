@@ -4454,6 +4454,8 @@ export type TToolCallPreviewsConfig = z.infer<typeof toolCallPreviewsConfigSchem
 export const documentsConfigSchema = z.object({
   /** Largest selected text sent to the model for one inline replacement. */
   aiEditMaxChars: z.number().int().min(100).max(500_000).default(20_000),
+  /** Inline selection edits allowed per user per hour. */
+  aiEditMaxPerHour: z.number().int().min(1).max(1_000).default(30),
   /** Maximum text length accepted for imports (file-to-document editing). */
   importMaxChars: z.number().int().min(1_000).max(2_000_000).default(200_000),
   /** Version snapshots kept per document; the oldest is pruned beyond it. */

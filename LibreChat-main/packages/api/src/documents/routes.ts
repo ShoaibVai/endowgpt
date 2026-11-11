@@ -1,5 +1,5 @@
-import type { Request, Response, Router } from 'express';
 import { Router as ExpressRouter } from 'express';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { documentUpsertSchema, aiEditRequestSchema } from 'librechat-data-provider';
 import type {
   TDocument,
@@ -10,6 +10,7 @@ import type {
   TAiEditResponse,
 } from 'librechat-data-provider';
 import type { DocumentMethods } from '@librechat/data-schemas';
+import type { Request, Response, Router } from 'express';
 import { aiEditDocumentText } from './aiEdit';
 
 /** endowGPT document artifacts: the storage-backed HTTP surface. Handlers stay
@@ -20,6 +21,7 @@ import { aiEditDocumentText } from './aiEdit';
 /** Documents config as resolved by AppService (`documents` in librechat.yaml). */
 export interface DocumentsLimits {
   aiEditMaxChars: number;
+  aiEditMaxPerHour: number;
   importMaxChars: number;
   versionHistoryCap: number;
   autosaveDelayMs: number;
@@ -61,7 +63,7 @@ function toWire(doc: {
     content: doc.content ?? '',
     createdAt: toMs(doc.createdAt),
     updatedAt: toMs(doc.updatedAt),
-    versionId: doc.lastVersionId ?? (versions.at(-1)?.id ?? ''),
+    versionId: doc.lastVersionId ?? (versions[versions.length - 1]?.id ?? ''),
     versions: versions.map((version) => ({
       id: version.id,
       title: version.title,
@@ -92,16 +94,32 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
   const limitsOf = (req: DocumentsRequest): DocumentsLimits =>
     deps.getLimits(req) ?? {
       aiEditMaxChars: 20000,
+      aiEditMaxPerHour: 30,
       importMaxChars: 200000,
       versionHistoryCap: 50,
       autosaveDelayMs: 800,
       allowedAiEditModels: [],
     };
 
+  /** Per-user hourly budget for inline edits (brief §6.4). The limit resolves
+   *  from config on every request, so a yaml retune applies immediately. */
+  const aiEditLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: (req) => limitsOf(req as DocumentsRequest).aiEditMaxPerHour,
+    keyGenerator: (req) => {
+      const userId = getUser(req as DocumentsRequest);
+      return userId ?? ipKeyGenerator(req.ip ?? '0.0.0.0');
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req: Request, res: Response) =>
+      res.status(429).json({ error: 'ai_edit_rate_limited' }),
+  });
+
   router.get('/', async (req: DocumentsRequest, res) => {
     const userId = getUser(req);
     if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return void res.status(401).json({ error: 'unauthorized' });
     }
     try {
       const docs = await documentMethods.getDocuments(userId);
@@ -112,17 +130,17 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
         updatedAt: toMs(doc.updatedAt),
         versionCount: doc.versionCount ?? 0,
       }));
-      return res.status(200).json(items);
+      return void res.status(200).json(items);
     } catch {
       // Storage outage: nothing about the query is safe or useful to echo.
-      return res.status(500).json({ error: 'document_list_failed' });
+      return void res.status(500).json({ error: 'document_list_failed' });
     }
   });
 
   router.get('/:conversationId/:artifactId', async (req: DocumentsRequest, res) => {
     const userId = getUser(req);
     if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return void res.status(401).json({ error: 'unauthorized' });
     }
     try {
       const doc = await documentMethods.getDocument({
@@ -131,27 +149,27 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
         artifactId: req.params.artifactId,
       });
       if (doc == null) {
-        return res.status(404).json({ error: 'document_not_found' });
+        return void res.status(404).json({ error: 'document_not_found' });
       }
-      return res.status(200).json(toWire(doc));
+      return void res.status(200).json(toWire(doc));
     } catch {
-      return res.status(500).json({ error: 'document_load_failed' });
+      return void res.status(500).json({ error: 'document_load_failed' });
     }
   });
 
   router.put('/:conversationId/:artifactId', async (req: DocumentsRequest<TDocumentUpsert>, res) => {
     const userId = getUser(req);
     if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return void res.status(401).json({ error: 'unauthorized' });
     }
     const parsed = documentUpsertSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: 'invalid_document_payload' });
+      return void res.status(400).json({ error: 'invalid_document_payload' });
     }
     const { title, content, baseVersionId, versionSource } = parsed.data;
     const limits = limitsOf(req);
     if (content.length > limits.importMaxChars) {
-      return res.status(413).json({ error: 'document_too_large' });
+      return void res.status(413).json({ error: 'document_too_large' });
     }
     try {
       const result = await documentMethods.upsertDocument({
@@ -165,23 +183,23 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
         versionHistoryCap: limits.versionHistoryCap,
       });
       if (result.ok) {
-        return res.status(200).json(toWire(result.document));
+        return void res.status(200).json(toWire(result.document));
       }
       // Another session advanced this document first: the current state goes
       // back with the conflict flag so the client can decide (reload or save
       // anyway). Never a raw error.
-      return res
+      return void res
         .status(409)
         .json({ ...toWire(result.document), conflict: true });
     } catch {
-      return res.status(500).json({ error: 'document_save_failed' });
+      return void res.status(500).json({ error: 'document_save_failed' });
     }
   });
 
   router.delete('/:conversationId/:artifactId', async (req: DocumentsRequest, res) => {
     const userId = getUser(req);
     if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return void res.status(401).json({ error: 'unauthorized' });
     }
     try {
       const deleted = await documentMethods.deleteDocument({
@@ -190,11 +208,11 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
         artifactId: req.params.artifactId,
       });
       if (!deleted) {
-        return res.status(404).json({ error: 'document_not_found' });
+        return void res.status(404).json({ error: 'document_not_found' });
       }
-      return res.status(204).send();
+      return void res.status(204).send();
     } catch {
-      return res.status(500).json({ error: 'document_delete_failed' });
+      return void res.status(500).json({ error: 'document_delete_failed' });
     }
   });
 
@@ -203,7 +221,7 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
     async (req: DocumentsRequest, res) => {
       const userId = getUser(req);
       if (!userId) {
-        return res.status(401).json({ error: 'unauthorized' });
+        return void res.status(401).json({ error: 'unauthorized' });
       }
       try {
         const version = await documentMethods.getDocumentVersion({
@@ -213,7 +231,7 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
           versionId: req.params.versionId,
         });
         if (version == null) {
-          return res.status(404).json({ error: 'version_not_found' });
+          return void res.status(404).json({ error: 'version_not_found' });
         }
         const payload: TDocumentVersionContent = {
           id: version.id,
@@ -221,9 +239,9 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
           createdAt: toMs(version.createdAt),
           content: version.content,
         };
-        return res.status(200).json(payload);
+        return void res.status(200).json(payload);
       } catch {
-        return res.status(500).json({ error: 'version_load_failed' });
+        return void res.status(500).json({ error: 'version_load_failed' });
       }
     },
   );
@@ -231,12 +249,13 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
   router.post('/:conversationId/:artifactId/restore', async (req: DocumentsRequest, res) => {
     const userId = getUser(req);
     if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return void res.status(401).json({ error: 'unauthorized' });
     }
     const versionId = (req.body as { versionId?: unknown } | undefined)?.versionId;
     if (typeof versionId !== 'string' || versionId.length === 0) {
-      return res.status(400).json({ error: 'invalid_restore_payload' });
+      return void res.status(400).json({ error: 'invalid_restore_payload' });
     }
+    const limits = limitsOf(req);
     try {
       const result = await documentMethods.restoreDocumentVersion({
         userId,
@@ -246,30 +265,30 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
         versionHistoryCap: limits.versionHistoryCap,
       });
       if (result.ok) {
-        return res.status(200).json(toWire(result.document));
+        return void res.status(200).json(toWire(result.document));
       }
-      return res.status(404).json({ error: 'version_not_found' });
+      return void res.status(404).json({ error: 'version_not_found' });
     } catch {
-      return res.status(500).json({ error: 'document_restore_failed' });
+      return void res.status(500).json({ error: 'document_restore_failed' });
     }
   });
 
-  router.post('/ai-edit', async (req: DocumentsRequest<TAiEditRequest>, res) => {
+  router.post('/ai-edit', aiEditLimiter, async (req: DocumentsRequest<TAiEditRequest>, res) => {
     const userId = getUser(req);
     if (!userId) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return void res.status(401).json({ error: 'unauthorized' });
     }
     const parsed = aiEditRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: 'invalid_ai_edit_payload' });
+      return void res.status(400).json({ error: 'invalid_ai_edit_payload' });
     }
     const { text, model } = parsed.data;
     const limits = limitsOf(req);
     if (!limits.allowedAiEditModels.includes(model)) {
-      return res.status(400).json({ error: 'ai_edit_model_not_allowed' });
+      return void res.status(400).json({ error: 'ai_edit_model_not_allowed' });
     }
     if (text.length > limits.aiEditMaxChars) {
-      return res.status(413).json({ error: 'ai_edit_selection_too_large' });
+      return void res.status(413).json({ error: 'ai_edit_selection_too_large' });
     }
     try {
       const result = await runAiEdit({
@@ -278,12 +297,12 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
       if (!result.ok) {
         // Provider failures map to stable codes the UI localizes; provider
         // payloads never reach the client.
-        return res.status(result.status).json({ error: result.code });
+        return void res.status(result.status).json({ error: result.code });
       }
       const payload: TAiEditResponse = { text: result.text };
-      return res.status(200).json(payload);
+      return void res.status(200).json(payload);
     } catch {
-      return res.status(502).json({ error: 'ai_edit_unavailable' });
+      return void res.status(502).json({ error: 'ai_edit_unavailable' });
     }
   });
 
