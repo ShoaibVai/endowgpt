@@ -118,7 +118,7 @@ LibreChat-main/      upstream LibreChat + endowGPT modules (see CHANGES.md)
 rag-api-main/        upstream RAG API
 scripts/             asset generation and smoke tests
 docker-compose.yml   the whole stack
-PLAN.md              design of record · CHANGES.md core-file change log
+PLAN.md              design of record · CHANGES.md change log · REPORT.md closing report
 ```
 
 ## Credits & licenses

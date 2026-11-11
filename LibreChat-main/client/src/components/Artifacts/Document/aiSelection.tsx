@@ -8,7 +8,6 @@ import type { ReactNode } from 'react';
 import { compactSpans, isMeaningfulDiff, wordDiff, type DiffSpan } from './diff';
 import { useAiEditDocumentMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
-import './suggestion.css';
 
 /** Inline AI selection edits (PLAN.md §7.1): each action sends the exact
  *  selected text to `/api/documents/ai-edit`, renders the replacement as an
