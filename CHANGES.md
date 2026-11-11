@@ -62,7 +62,7 @@ theme tokens, copy via `useLocalize()`).
 | `scripts/brand-assets.mjs` (repo root) | M2 | raster-first asset pipeline: full-canvas SVG renders in Chrome, pixel-space crops/plates/ICO, splash transcodes |
 | `api/server/routes/documents.js` | M4 | thin CJS mount: requires `@librechat/api` router, `~/models` methods, config middleware |
 | `packages/api/src/documents/index.ts` | M4 | TS entry: router factory + provider call |
-| `packages/api/src/documents/routes.ts` | M4 | express router: zod validation, limits via `req.config.documents`, status mapping (409 conflict, coded 5xx) |
+| `packages/api/src/documents/routes.ts` | M4/M5 | express router: zod validation, per-request limits, per-user hourly ai-edit limiter, status mapping (409 conflict, coded 5xx) |
 | `packages/api/src/documents/aiEdit.ts` | M5 | OpenCode-backed selection-edit call; allow-list + safe error codes |
 | `packages/data-schemas/src/schema/document.ts` | M4 | Mongo schema (document + version snapshots + tenant isolation) |
 | `packages/data-schemas/src/types/document.ts` | M4 | document types/params/results |
@@ -116,11 +116,17 @@ theme tokens, copy via `useLocalize()`).
 - **M2** — brand pipelines + assets, config levers (`interface.logoSplash`,
   `documents` block), splash component + App mount, theme-aware login logo,
   `/credits` page, PWA manifest + shell branding, client dependency additions.
-- **M3+M4** - `application/vnd.endowgpt.document` end to end: client MIME +
+- **M3+M4** — `application/vnd.endowgpt.document` end to end: client MIME +
   dispatch + TipTap editor (markdown bridge, serialized autosave, toolbar),
   shared data-provider surface, Mongo storage with version snapshots and
   restore, `packages/api` documents router + aiEdit provider call, prompt
   guidance, React Query hooks, markdown round-trip tests, smoke script.
+- **M5+M6** — AI selection edits (BubbleMenu, word-diff marks, accept/reject,
+  per-user hourly limiter), versions drawer with restore, DOCX/PDF/rich-copy
+  exports, `/documents` pages, file-to-document import, `librechat.yaml`
+  tracked in git, live stack booted: Mongo/Meili/pgvector/Ollama/RAG/API all
+  healthy; authenticated probes verified upsert/conflict/restore/ai-edit
+  mapping; boot smoke green (model calls skip on the key's free-tier quota).
 - **M5** - selection edits and history: floating TipTap BubbleMenu with
   Rewrite/Expand/Shorten/Fix grammar/Translate, a Professional/Casual/
   Persuasive tone submenu, and an inline "Ask AI…" instruction; suggestions
