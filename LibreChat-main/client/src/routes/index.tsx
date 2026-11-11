@@ -61,6 +61,16 @@ const loadCredits = () =>
     Component: m.default,
   }));
 
+const loadDocumentsList = () =>
+  importWithRecovery(() => import('~/components/Artifacts/Document/DocumentsList')).then((m) => ({
+    Component: m.default,
+  }));
+
+const loadDocumentPage = () =>
+  importWithRecovery(() => import('~/components/Artifacts/Document/DocumentPage')).then((m) => ({
+    Component: m.default,
+  }));
+
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
@@ -208,6 +218,14 @@ export const router = createBrowserRouter(
                 {
                   path: 'agents/:category',
                   element: <MarketplaceRoute />,
+                },
+                {
+                  path: 'documents',
+                  lazy: loadDocumentsList,
+                },
+                {
+                  path: 'documents/:conversationId/:artifactId',
+                  lazy: loadDocumentPage,
                 },
               ],
             },

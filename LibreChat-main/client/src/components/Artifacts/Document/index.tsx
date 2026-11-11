@@ -14,28 +14,38 @@ import { Button, useToastContext } from '@librechat/client';
 import {
   Bold,
   Code2,
+  FileDown,
+  FileText,
   Heading1,
   Heading2,
   Heading3,
+  History,
   Italic,
   Link2,
   List,
   ListOrdered,
+  Copy,
   Redo2,
   Strikethrough,
   Table as TableIcon,
   Underline as UnderlineIcon,
   Undo2,
+  X,
 } from 'lucide-react';
 import type { Artifact } from '~/common';
 import { TOOL_ARTIFACT_TYPES } from '~/utils/artifacts';
 import { ArtifactCodeEditor } from '../ArtifactCodeEditor';
-import { useEditArtifact } from '~/data-provider';
+import { useEditArtifact, useGetStartupConfig, useSaveDocumentMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import { useArtifactsContext } from '~/Providers';
 import { htmlToMd, mdToHtml } from './markdown';
-import { copyAsRichText } from './exporters';
+import { copyAsRichText, markdownToDocxBlob, markdownToPdfBlob } from './exporters';
+import { acceptSuggestion, findSuggestionRange, rejectSuggestion, type SuggestionRange } from './suggestionActions';
+import SelectionActions from './aiSelection';
+import VersionsDrawer from './versions';
 import { EndowDeleteMark, EndowInsertMark } from './tiptapMarks';
 import './document.css';
+import './suggestion.css';
 
 /* Editor toolbar rounds common writing actions first; the mark edit route
  * (`heading`, lists, table, link, undo/redo) sits in the same row and stays
@@ -61,14 +71,60 @@ const BASE_EXTENSIONS = [
 export default function DocumentArtifactTabs({
   artifact,
   isSharedConvo,
+  conversationId: conversationIdProp,
 }: {
   artifact: Artifact;
   isSharedConvo?: boolean;
+  /** Set by the standalone /documents route, which sits outside the chat
+   *  layout's ArtifactsProvider. */
+  conversationId?: string | null;
 }) {
+  const artifactsContext = useArtifactsContext();
+  const conversationId = conversationIdProp ?? artifactsContext.conversationId;
   const localize = useLocalize();
   const { showToast } = useToastContext();
-  const readOnly = isSharedConvo === true || artifact.index == null;
+  const { data: startupConfig } = useGetStartupConfig();
+  /** Shared transcripts render read-only; a missing message index is fine for
+   *  store-backed documents (the /documents route has no message to edit). */
+  const readOnly = isSharedConvo === true;
   const monacoRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
+  /** The selection edits ride the deployment's default model (allow-listed
+   *  server-side); falling back to the first spec when none is marked default. */
+  const aiEditModel = useMemo(() => {
+    const specs = startupConfig?.modelSpecs?.list ?? [];
+    const preferred = specs.find((spec) => spec.default === true) ?? specs[0];
+    return preferred?.preset?.model ?? 'deepseek-v4.1-flash-free';
+  }, [startupConfig?.modelSpecs?.list]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [pendingSuggestion, setPendingSuggestion] = useState<SuggestionRange | null>(null);
+  /** Editor-local markdown mirror, so the docx/pdf exports and the save path
+   *  agree on what the user is looking at. */
+  const [currentMarkdown, setCurrentMarkdown] = useState<string | null>(null);
+  /** Newest /api/documents version id this editor has written; the next save
+   *  sends it as `baseVersionId`, so a rival session's write surfaces as a 409. */
+  const lastVersionIdRef = useRef<string | null>(null);
+  /** Editor artifactId: the artifact id doubles as the document store key. */
+  const documentArtifactId = artifact.id;
+  /** The 409 carries the current store state; the user can keep editing after
+   *  a reload instead of losing work. */
+  const saveDocumentMutation = useSaveDocumentMutation(
+    conversationId ?? '',
+    documentArtifactId,
+    {
+      onError: (error) => {
+        savingRef.current = false;
+        setIsSaving(false);
+        const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
+        showToast({
+          status: 'error',
+          message:
+            status === 409
+              ? localize('com_ui_document_conflict')
+              : localize('com_error_document_save_failed'),
+        });
+      },
+    },
+  );
 
   /** Markdown the editor currently renders; used to detect external model
    *  updates (a model edit or a version switch) vs. a user's own keystrokes. */
@@ -95,28 +151,39 @@ export default function DocumentArtifactTabs({
         pendingSaveRef.current = markdown;
         return;
       }
-      const target = getArtifactEditTarget(artifact);
-      if (target == null) {
-        return;
-      }
       savingRef.current = true;
       setIsSaving(true);
-      editArtifact.mutate(
+
+      /** The store write is the source of truth (versions + conflict
+       *  detection); the message artifact follows when this document lives
+       *  inside a conversation message. */
+      saveDocumentMutation.mutate(
         {
-          messageId: target.messageId,
-          index: target.index,
-          original: importedMarkdownRef.current ?? sourceMarkdown,
-          updated: markdown,
+          title: artifact.title?.trim() || 'Untitled document',
+          content: markdown,
+          baseVersionId: lastVersionIdRef.current ?? undefined,
+          versionSource: 'user',
         },
         {
-          onSuccess: (_data, vars) => {
-            importedMarkdownRef.current = vars.updated;
+          onSuccess: (data) => {
+            importedMarkdownRef.current = data.content;
+            lastVersionIdRef.current = data.versionId;
             savingRef.current = false;
             setIsSaving(false);
             const queued = pendingSaveRef.current;
             pendingSaveRef.current = null;
-            if (queued != null && queued !== vars.updated) {
+            if (queued != null && queued !== data.content) {
               flushSave(queued);
+              return;
+            }
+            const target = getArtifactEditTarget(artifact);
+            if (target != null && target.messageId) {
+              editArtifact.mutate({
+                messageId: target.messageId,
+                index: target.index,
+                original: importedMarkdownRef.current ?? sourceMarkdown,
+                updated: data.content,
+              });
             }
           },
           onError: () => {
@@ -130,7 +197,8 @@ export default function DocumentArtifactTabs({
         },
       );
     },
-    [artifact, editArtifact, localize, showToast, sourceMarkdown],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [artifact, localize, showToast, sourceMarkdown],
   );
 
   const editor = useEditor({
@@ -143,6 +211,7 @@ export default function DocumentArtifactTabs({
         return;
       }
       const nextMarkdown = htmlToMd(current.getHTML());
+      setCurrentMarkdown(nextMarkdown);
       if (nextMarkdown === importedMarkdownRef.current) {
         return;
       }
@@ -150,6 +219,9 @@ export default function DocumentArtifactTabs({
       autosaveTimer.current = setTimeout(() => {
         flushSave(nextMarkdown);
       }, 800);
+    },
+    onTransaction: ({ editor: current }) => {
+      setPendingSuggestion(findSuggestionRange(current));
     },
   });
 
@@ -168,6 +240,45 @@ export default function DocumentArtifactTabs({
   }, [sourceMarkdown, editor]);
 
   useEffect(() => () => clearTimeout(autosaveTimer.current), []);
+
+  const handleAcceptSuggestion = useCallback(() => {
+    if (pendingSuggestion != null && editor) {
+      acceptSuggestion(editor, pendingSuggestion);
+      setPendingSuggestion(null);
+    }
+  }, [editor, pendingSuggestion]);
+
+  const handleRejectSuggestion = useCallback(() => {
+    if (pendingSuggestion != null && editor) {
+      rejectSuggestion(editor, pendingSuggestion);
+      setPendingSuggestion(null);
+    }
+  }, [editor, pendingSuggestion]);
+
+  const downloadBlob = useCallback((blob: Blob, filename: string, mime: string) => {
+    const url = URL.createObjectURL(new Blob([blob], { type: mime }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const exportBaseName = useCallback(
+    () => (artifact.title?.trim() || 'document').replace(/[\\/:*?"<>|]/g, '-'),
+    [artifact.title],
+  );
+
+  const handleExportPdf = useCallback(async () => {
+    const markdown = currentMarkdown ?? importedMarkdownRef.current ?? sourceMarkdown;
+    downloadBlob(markdownToPdfBlob(markdown), `${exportBaseName()}.pdf`, 'application/pdf');
+  }, [currentMarkdown, downloadBlob, exportBaseName, sourceMarkdown]);
+
+  const handleExportDocx = useCallback(async () => {
+    const markdown = currentMarkdown ?? importedMarkdownRef.current ?? sourceMarkdown;
+    const blob = await markdownToDocxBlob(markdown, artifact.title ?? 'endowGPT document');
+    downloadBlob(blob, `${exportBaseName()}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  }, [artifact.title, currentMarkdown, downloadBlob, exportBaseName, sourceMarkdown]);
 
   const handleCopyRich = useCallback(async () => {
     if (!editor) {
@@ -312,9 +423,77 @@ export default function DocumentArtifactTabs({
             icon={<Redo2 className="size-4" />}
             disabled={!editor.can().redo()}
           />
+          <Divider />
+          <ToolbarButton
+            name="copy-rich"
+            label={localize('com_ui_copy_rich_text')}
+            onClick={() => void handleCopyRich()}
+            active={false}
+            icon={<Copy className="size-4" />}
+          />
+          <ToolbarButton
+            name="export-docx"
+            label={localize('com_ui_export_docx')}
+            onClick={() => void handleExportDocx()}
+            active={false}
+            icon={<FileText className="size-4" />}
+          />
+          <ToolbarButton
+            name="export-pdf"
+            label={localize('com_ui_export_pdf')}
+            onClick={() => void handleExportPdf()}
+            active={false}
+            icon={<FileDown className="size-4" />}
+          />
+          <ToolbarButton
+            name="versions"
+            label={localize('com_ui_document_versions')}
+            onClick={() => setShowVersions((open) => !open)}
+            active={showVersions}
+            icon={<History className="size-4" />}
+            disabled={conversationId == null}
+          />
           <div className="ml-auto px-1 text-xs opacity-60">
             {isSaving ? localize('com_ui_saving') : localize('com_ui_saved')}
           </div>
+        </div>
+      )}
+      {!readOnly && (
+        <SelectionActions editor={editor} model={aiEditModel} />
+      )}
+      {pendingSuggestion != null && !readOnly && (
+        <div
+          className="endow-suggestion-review border-border-light bg-surface-primary-alt flex items-center gap-1 border-b px-2 py-1"
+          data-testid="endow-suggestion-review"
+        >
+          <span className="text-text-secondary px-1 text-xs">
+            {localize('com_ui_suggestion_review')}
+          </span>
+          <Button
+            size="sm"
+            variant="submit"
+            className="h-7 px-2 text-xs"
+            onClick={handleAcceptSuggestion}
+          >
+            {localize('com_ui_suggestion_accept')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={handleRejectSuggestion}
+          >
+            {localize('com_ui_suggestion_reject')}
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={handleRejectSuggestion}
+            aria-label={localize('com_ui_close')}
+          >
+            <X className="size-4" aria-hidden="true" />
+          </Button>
         </div>
       )}
       <Tabs.Content
@@ -326,11 +505,6 @@ export default function DocumentArtifactTabs({
         <div className="prose prose-sm sm:prose-base max-w-none bg-surface-primary text-text-primary px-8 py-6">
           <EditorContent editor={editor} />
         </div>
-        <div className="sr-only">
-          <button type="button" onClick={handleCopyRich}>
-            {localize('com_ui_copy')}
-          </button>
-        </div>
       </Tabs.Content>
       <Tabs.Content
         value="code"
@@ -340,6 +514,18 @@ export default function DocumentArtifactTabs({
       >
         <ArtifactCodeEditor artifact={artifact} monacoRef={monacoRef} readOnly={readOnly} />
       </Tabs.Content>
+      {showVersions && conversationId != null && (
+        <VersionsDrawer
+          conversationId={conversationId}
+          artifactId={artifact.id}
+          onClose={() => setShowVersions(false)}
+          onRestored={(markdown) => {
+            importedMarkdownRef.current = markdown;
+            editor?.commands.setContent(mdToHtml(markdown), false);
+            setCurrentMarkdown(markdown);
+          }}
+        />
+      )}
     </div>
   );
 }

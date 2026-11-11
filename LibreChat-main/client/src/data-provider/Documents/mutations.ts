@@ -62,20 +62,30 @@ export const useRestoreDocumentMutation = (
 };
 
 export const useDeleteDocumentMutation = (
-  conversationId: string,
-  artifactId: string,
-  _options?: UseMutationOptions<void, Error, void>,
-): UseMutationResult<void, Error, void, unknown> => {
+  _options?: UseMutationOptions<void, Error, { conversationId: string; artifactId: string }>,
+): UseMutationResult<
+  void,
+  Error,
+  { conversationId: string; artifactId: string },
+  unknown
+> => {
   const queryClient = useQueryClient();
   const { onSuccess, onError, onMutate, ...options } = _options ?? {};
-  const mutationOptions: UseMutationOptions<void, Error, void> = {
-    mutationKey: [MutationKeys.documentDelete, conversationId, artifactId],
-    mutationFn: () => dataService.deleteDocument(conversationId, artifactId),
+  const mutationOptions: UseMutationOptions<
+    void,
+    Error,
+    { conversationId: string; artifactId: string }
+  > = {
+    mutationKey: [MutationKeys.documentDelete],
+    mutationFn: ({ conversationId, artifactId }) =>
+      dataService.deleteDocument(conversationId, artifactId),
     onMutate,
     onError,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.documents] });
-      queryClient.removeQueries({ queryKey: [QueryKeys.documents, conversationId, artifactId] });
+      queryClient.removeQueries({
+        queryKey: [QueryKeys.documents, variables.conversationId, variables.artifactId],
+      });
       onSuccess?.(data, variables, context);
     },
     ...options,

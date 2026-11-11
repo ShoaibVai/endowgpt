@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import copy from 'copy-to-clipboard';
-import { Download } from 'lucide-react';
+import { Download, PencilLine } from 'lucide-react';
 import {
   Button,
   OGDialog,
@@ -21,12 +22,78 @@ import {
   useFilePreviewBlob,
   useFileDownload,
   useSharedFileDownload,
+  useSaveDocumentMutation,
 } from '~/data-provider';
 import { getDownloadFilename, logger, sortPagesByRelevance, triggerDownload } from '~/utils';
 import { useMessagePartsHost } from '~/Providers/MessagePartsHostContext';
 import CopyButton from '~/components/Messages/Content/CopyButton';
-import { useShareContext } from '~/Providers';
+import { useShareContext, useArtifactsContext } from '~/Providers';
 import { useLocalize } from '~/hooks';
+
+/** endowGPT: one shared import action; the save lands in the document store
+ *  keyed by the current conversation, then the route opens the full editor. */
+function EditDocumentAction({
+  fileName,
+  text,
+  open,
+}: {
+  fileName: string;
+  text: string;
+  open: boolean;
+}) {
+  const localize = useLocalize();
+  const navigate = useNavigate();
+  const { conversationId } = useArtifactsContext();
+  const [saving, setSaving] = useState(false);
+  const artifactId = useMemo(
+    () => `imported-${Buffer.from(fileName).toString('base64url').slice(0, 24)}`,
+    [fileName],
+  );
+  const saveDocument = useSaveDocumentMutation(conversationId ?? '', artifactId);
+
+  useEffect(() => {
+    if (!open) {
+      setSaving(false);
+    }
+  }, [open]);
+
+  const handleClick = () => {
+    if (conversationId == null || saving) {
+      return;
+    }
+    setSaving(true);
+    saveDocument.mutate(
+      {
+        title: fileName.replace(/\.[^.]+$/, '') || fileName,
+        content: text,
+        versionSource: 'import',
+      },
+      {
+        onSuccess: () => {
+          navigate(
+            `/documents/${encodeURIComponent(conversationId)}/${encodeURIComponent(artifactId)}`,
+          );
+        },
+        onError: () => {
+          setSaving(false);
+        },
+      },
+    );
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={saving || conversationId == null}
+      className="text-text-secondary hover:text-text-primary focus-visible:ring-focus-subtle inline-flex shrink-0 items-center gap-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-hidden disabled:opacity-50"
+      aria-label={`${localize('com_ui_edit_document')} ${fileName}`}
+    >
+      <PencilLine className="size-3" aria-hidden="true" />
+      {localize('com_ui_edit_document')}
+    </button>
+  );
+}
 
 interface FilePreviewDialogProps {
   open: boolean;
@@ -282,6 +349,15 @@ export default function FilePreviewDialog({
                 <Download className="size-3" aria-hidden="true" />
                 {localize('com_ui_download')}
               </button>
+            )}
+            {/* endowGPT: import the file's extracted text into the document
+                editor, so "edit this document" starts from the real content */}
+            {displayedText != null && displayedText.trim().length > 0 && (
+              <EditDocumentAction
+                fileName={fileName}
+                text={displayedText}
+                open={open}
+              />
             )}
           </div>
         </div>

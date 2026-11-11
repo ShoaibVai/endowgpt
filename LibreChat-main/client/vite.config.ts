@@ -112,7 +112,7 @@ export default defineConfig(({ command }) => ({
            * additional manifest entry, so globbing it too duplicates the precache entry. */
           'assets/maskable-icon.png',
           'assets/endowgpt-logo-*.svg',
-          'assets/endowgpt-mark*.svg',
+          'assets/endowgpt-mark*.png',
           'assets/logo-reveal.*',
         ],
         globIgnores: [

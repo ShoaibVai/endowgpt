@@ -49,10 +49,28 @@ export function createDocumentMethods(
 
   async function getDocuments(userId: string): Promise<IDocumentLean[]> {
     const Document = mongoose.models.Document;
-    return Document.find({ user: userId })
+    const docs = await Document.find({ user: userId })
       .select('artifactId conversationId title updatedAt versions')
       .sort({ updatedAt: -1 })
-      .lean<IDocumentLean[]>();
+      .lean<
+        Array<{
+          artifactId: string;
+          conversationId: string;
+          title: string;
+          updatedAt?: Date | number;
+          versions?: IDocumentVersion[];
+        }>
+      >();
+    /** The list view needs a count, not every snapshot body: computing it here
+     *  keeps the payload small and matches `IDocumentLean`. */
+    return docs.map((doc) => ({
+      artifactId: doc.artifactId,
+      conversationId: doc.conversationId,
+      title: doc.title,
+      updatedAt:
+        doc.updatedAt instanceof Date ? doc.updatedAt.getTime() : Number(doc.updatedAt ?? 0),
+      versionCount: doc.versions?.length ?? 0,
+    }));
   }
 
   async function getDocument({
@@ -157,14 +175,28 @@ export function createDocumentMethods(
     }
 
     const preRestoreId = newVersionId();
-    const snapshot = {
-      id: preRestoreId,
-      title: existing.title,
-      content: existing.content,
-      createdAt: Date.now(),
-      source: 'restore' as const,
-    };
-    const versions = [...(existing.versions ?? []), snapshot];
+    const restoredId = newVersionId();
+    const now = Date.now();
+    const versions: IDocumentVersion[] = [
+      ...(existing.versions ?? []),
+      {
+        id: preRestoreId,
+        title: existing.title,
+        content: existing.content,
+        createdAt: now,
+        source: 'restore',
+      },
+      /** The restored content becomes its own snapshot too, so "current
+       *  version" in the UI names the state the editor is showing and the
+       *  restored snapshot stays reachable in history. */
+      {
+        id: restoredId,
+        title: target.title,
+        content: target.content,
+        createdAt: now + 1,
+        source: 'restore',
+      },
+    ];
     while (versions.length > versionHistoryCap) {
       versions.shift();
     }
@@ -177,7 +209,7 @@ export function createDocumentMethods(
           title: target.title,
           content: target.content,
           versions,
-          lastVersionId: preRestoreId,
+          lastVersionId: restoredId,
         },
       },
       { new: true, runValidators: true },

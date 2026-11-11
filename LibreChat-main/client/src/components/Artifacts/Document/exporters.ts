@@ -28,13 +28,14 @@ interface Token {
   depth?: number;
   items?: Token[];
   tokens?: Token[];
-  rows?: Token[];
+  /** Table rows: each entry is one row of cell tokens. */
+  rows?: Token[][];
   header?: Token[];
 }
 
 /** Collapse character escapes (Turndown/marked insert them for literal punctuation). */
 function normalizeText(raw: string): string {
-  return raw.replace(/\\([[\]()~`*_.\\-])/g, '$1');
+  return raw.replace(/\\([\\`*_{}\[\]()#+\-.!>~|])/g, '$1');
 }
 
 function docxInlineRuns(
@@ -217,7 +218,9 @@ function markdownToDocxBlocks(
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({ children: cellsOf(token.header) }),
-              ...(token.rows ?? []).map((row) => new TableRow({ children: cellsOf([row]) })),
+              ...(token.rows ?? []).map(
+                (row) => new TableRow({ children: cellsOf(row) }),
+              ),
             ],
           }),
         );
@@ -322,8 +325,10 @@ export function markdownToPdfBlob(markdown: string): Blob {
         }
         break;
       case 'table': {
-        const rows: Token[][] = [token.header ?? [], ...(token.rows ?? [])];
-        for (const row of rows) {
+        const headerRow: Token[] = token.header ?? [];
+        const bodyRows: Token[][] = token.rows ?? [];
+        const allRows: Token[][] = [headerRow].concat(bodyRows);
+        for (const row of allRows) {
           const cells = row.map(
             (cell) => (cell.tokens ?? []).map((c) => c.raw ?? '').join(''),
           );

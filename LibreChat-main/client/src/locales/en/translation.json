@@ -3816,5 +3816,17 @@
   "com_ui_selection_custom": "Custom…",
   "com_ai_edit_error_rate_limited": "The model is rate-limited right now. Wait a few seconds and try again.",
   "com_ai_edit_error_auth": "endowGPT could not reach the model provider. Your account keys may have expired.",
-  "com_ai_edit_error_unavailable": "The model provider is having trouble. Try again shortly."
+  "com_ai_edit_error_unavailable": "The model provider is having trouble. Try again shortly.",
+  "com_ui_document_restored": "Version restored.",
+  "com_error_document_restore_failed": "This version could not be restored. Try again in a moment.",
+  "com_ui_document_no_versions": "No versions yet. Edits are snapshotted as you work.",
+  "com_ui_document_open_versions": "Version history",
+  "com_ui_suggestion_review": "Suggested change",
+  "com_ai_edit_failed": "The edit could not be generated. Try again in a moment.",
+  "com_ui_documents": "Documents",
+  "com_ui_documents_empty": "No documents yet. Ask endowGPT to draft one, or import a file from a chat.",
+  "com_ui_back_to_chat": "Back to chat",
+  "com_ui_document_deleted": "Document deleted.",
+  "com_error_document_load_failed": "This document could not be loaded. It may have been deleted.",
+  "com_ui_edit_document": "Edit this document"
 }
