@@ -3709,6 +3709,8 @@ export type TStartupConfig = {
    * is advertised. */
   codeWorkspaceInheritanceVersion?: typeof CODE_WORKSPACE_INHERITANCE_VERSION;
   interface?: TInterfaceConfig;
+  /** endowGPT document editor limits, resolved from `documents` in librechat.yaml. */
+  documents?: TDocumentsConfig;
   turnstile?: TTurnstileConfig;
   balance?: TBalanceConfig;
   transactions?: TTransactionsConfig;
@@ -4458,6 +4460,12 @@ export const documentsConfigSchema = z.object({
   versionHistoryCap: z.number().int().min(3).max(500).default(50),
   /** Client autosave debounce in milliseconds. */
   autosaveDelayMs: z.number().int().min(200).max(10_000).default(800),
+  /** Models the inline selection edits may invoke. Requests with any other
+   *  model are rejected before they leave the deployment. */
+  allowedAiEditModels: z.array(z.string()).default([
+    'deepseek-v4.1-flash-free',
+    'glm-5.3-flash-free',
+  ]),
 });
 
 export type TDocumentsConfig = z.infer<typeof documentsConfigSchema>;

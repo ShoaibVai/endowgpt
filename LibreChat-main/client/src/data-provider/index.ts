@@ -1,5 +1,7 @@
 export * from './Auth';
 export * from './Agents';
+/* endowGPT document artifacts */
+export * from './Documents';
 export * from './Endpoints';
 export * from './Skills';
 export * from './Files';

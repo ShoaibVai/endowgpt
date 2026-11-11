@@ -28,6 +28,7 @@ Use exactly one of these types. Other code (scripts, JSON, CSS, backend or proje
 - \`image/svg+xml\`: one \`<svg>\` element with a \`viewBox\` so it scales to the panel.
 - \`application/vnd.mermaid\`: Mermaid diagram source only.
 - \`text/markdown\`: a Markdown document. Raw HTML, math, and Mermaid are not rendered in it.
+- \`application/vnd.endowgpt.document\`: an editable document the user works in afterwards (memos, briefs, plans, reports, documentation). Write GitHub-Flavored Markdown: \`#\`-level headings for structure, tables for structured facts, bullet or numbered lists for steps, and plain paragraphs; no raw HTML, images, or math. Keep every heading unique and reasonably short because the editor's outline uses them. When the user asks for a document, doc, memo, brief, or report, prefer this type over \`text/markdown\`.
 
 Draw placeholder images with inline SVG or CSS instead of placeholder-service URLs, which don't return images.
 

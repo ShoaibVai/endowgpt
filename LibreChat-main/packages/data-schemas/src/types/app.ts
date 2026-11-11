@@ -115,6 +115,8 @@ export interface AppConfig {
   imageOutputType: string;
   /** Interface configuration */
   interfaceConfig?: TCustomConfig['interface'];
+  /** endowGPT document editor limits */
+  documents?: TCustomConfig['documents'];
   /** Turnstile configuration */
   turnstileConfig?: Partial<TCustomConfig['turnstile']>;
   /** Balance configuration */

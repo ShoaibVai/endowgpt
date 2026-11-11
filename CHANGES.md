@@ -30,9 +30,9 @@ theme tokens, copy via `useLocalize()`).
 | `packages/data-provider/src/config.ts` | M2/M4 | `interface.logoSplash` + `documents` configSchema block (levers, defaults) + document types/schemas |
 | `packages/data-provider/src/documents.ts` | M2/M4 | shared document API types, zod schemas, data service (new file) |
 | `packages/data-provider/src/keys.ts` | M4 | document query/mutation keys |
-| `client/src/utils/artifacts.ts` | M3 | register `application/vnd.endowgpt.document` MIME + aliases |
+| `client/src/utils/artifacts.ts` | M3 | register `application/vnd.endowgpt.document` MIME + aliases + row kind |
 | `client/src/components/Artifacts/ArtifactTabs.tsx` | M3 | dispatch the `document` artifact type to the TipTap editor |
-| `client/src/components/Artifacts/Artifacts.tsx` | M3 | version back/forward chrome, download/copy wiring for documents |
+| `client/src/components/Artifacts/Artifacts.tsx` | M5 | version back/forward chrome, download/copy wiring for documents |
 | `client/src/components/Chat/Messages/Content/FilePreviewDialog.tsx` | M6 | "Edit this document" import action |
 | `client/src/components/Auth/AuthLayout.tsx` | M2 | theme-aware endowGPT login logo (CSS band crop) |
 | `client/index.html` | M2 | endowGPT title, description, theme-color |
@@ -42,29 +42,41 @@ theme tokens, copy via `useLocalize()`).
 | `client/src/routes/index.tsx` | M2/M5 | `/credits` route now; `/documents` routes in M5 |
 | `client/src/locales/en/translation.json` | M2–M6 | endowGPT copy keys |
 | `client/package.json` | M2 | TipTap suite, marked, turndown(+gfm), diff, docx, jspdf, @types/turndown |
-| `api/server/routes/index.js` | M4 | mount `/api/documents` (thin wiring into TS router) |
-| `packages/data-schemas/src/schema/document.ts` | M4 | Mongo schema for documents + version snapshots (new file) |
+| `api/server/index.js` | M4 | mount `/api/documents` |
+| `api/server/routes/index.js` | M4 | register the documents router |
+| `api/server/routes/config.js` | M4 | expose `documents` limits in the startup payload |
+| `packages/data-provider/src/api-endpoints.ts` | M4 | `/api/documents` endpoint builders |
+| `packages/data-provider/src/index.ts` | M4 | export the documents module |
+| `packages/api/src/index.ts` | M4 | export the documents TS module |
+| `packages/data-schemas/src/types/app.ts` | M4 | `AppConfig.documents` (AppService-resolved limits) |
+| `packages/data-schemas/src/app/service.ts` | M4 | parse `documents` from librechat.yaml into AppConfig |
+| `packages/data-schemas/src/types/document.ts` | M4 | document types/params/results (new file) |
 | `packages/data-schemas/src/schema/index.ts` | M4 | export the new schema |
-| `packages/data-schemas/src/models/document.ts` | M4 | model + seeded indexes (new file) |
-| `packages/data-schemas/src/models/index.ts` | M4 | export the new model |
-| `packages/data-schemas/src/methods/document.ts` | M4 | upsert/list/get/restore/version methods (new file) |
-| `packages/data-schemas/src/methods/index.ts` | M4 | export the new methods |
+| `packages/data-schemas/src/models/index.ts` | M4 | register the model in `createModels` |
+| `packages/data-schemas/src/methods/index.ts` | M4 | fold document methods into `createMethods` |
 
 ## New feature modules (endowGPT files inside LibreChat-main)
 
 | Path | Milestone | Purpose |
 |---|---|---|
 | `scripts/brand-assets.mjs` (repo root) | M2 | raster-first asset pipeline: full-canvas SVG renders in Chrome, pixel-space crops/plates/ICO, splash transcodes |
-| `api/server/routes/documents.js` | M4 | thin CJS mount of the documents TS router |
-| `packages/api/src/documents/index.ts` | M4 | TS entry: router factory + service wiring |
-| `packages/api/src/documents/service.ts` | M4 | document CRUD/version restore against data-schemas methods |
-| `packages/api/src/documents/aiEdit.ts` | M5 | OpenCode-backed selection-edit call with allow-listed models + safe errors |
-| `packages/api/src/documents/routes.ts` | M4 | express router with zod validation and status mapping |
+| `api/server/routes/documents.js` | M4 | thin CJS mount: requires `@librechat/api` router, `~/models` methods, config middleware |
+| `packages/api/src/documents/index.ts` | M4 | TS entry: router factory + provider call |
+| `packages/api/src/documents/routes.ts` | M4 | express router: zod validation, limits via `req.config.documents`, status mapping (409 conflict, coded 5xx) |
+| `packages/api/src/documents/aiEdit.ts` | M5 | OpenCode-backed selection-edit call; allow-list + safe error codes |
+| `packages/data-schemas/src/schema/document.ts` | M4 | Mongo schema (document + version snapshots + tenant isolation) |
+| `packages/data-schemas/src/types/document.ts` | M4 | document types/params/results |
+| `packages/data-schemas/src/models/document.ts` | M4 | model factory with tenant isolation |
+| `packages/data-schemas/src/methods/document.ts` | M4 | upsert/list/get/version/restore/delete methods |
+| `packages/data-provider/src/documents.ts` | M4 | shared request/response schemas + REST service |
 | `client/src/components/Artifacts/Document/index.tsx` | M4 | TipTap editor surface exposed through the artifact panel |
-| `client/src/components/Artifacts/Document/editor/` | M4 | toolbar, menus, markdown I/O, exporters |
-| `client/src/components/Artifacts/Document/store.ts` | M4 | feature-owned Jotai atoms (content, pending suggestion, versions) |
-| `client/src/components/Artifacts/Document/marks.ts` | M5 | `endowInsert`/`endowDelete` TipTap marks for inline diffs |
+| `client/src/components/Artifacts/Document/markdown.ts` | M4 | marked ↔ turndown Markdown bridge |
+| `client/src/components/Artifacts/Document/exporters.ts` | M4 | DOCX/PDF/rich-copy exports (client-side) |
+| `client/src/components/Artifacts/Document/tiptapMarks.ts` | M5 | `endowInsert`/`endowDelete` TipTap marks for inline diffs |
+| `client/src/components/Artifacts/Document/store.ts` | M5 | feature-owned Jotai atoms (pending suggestion, versions) |
+| `client/src/components/Artifacts/Document/document.css` | M4 | editor-local markdown metrics + suggestion mark styling |
 | `client/src/components/Artifacts/Document/versions.tsx` | M5 | history drawer, preview, restore |
+| `client/src/data-provider/Documents/` | M4 | React Query hooks (queries + mutations) |
 | `client/src/components/Brand/logos.ts` | M2 | single source of logo paths + CSS crop constants |
 | `client/src/components/Brand/LogoSplash.tsx` | M2 | once-per-session reveal video with static fallback; skip + reduced-motion |
 | `client/src/components/Brand/Credits.tsx` | M2 | `/credits` attribution page |
@@ -95,7 +107,9 @@ theme tokens, copy via `useLocalize()`).
 
 - **M0** — plan, scaffold, env template, .gitignore. No upstream edits.
 - **M1** — compose stack + librechat.yaml model wiring. No upstream edits.
-- **M2 (in progress)** — brand pipelines + assets, config levers
-  (`interface.logoSplash`, `documents` block), splash component + App mount,
-  theme-aware login logo, `/credits` page, PWA manifest + shell branding,
-  client dependency additions.
+- **M2** — brand pipelines + assets, config levers (`interface.logoSplash`,
+  `documents` block), splash component + App mount, theme-aware login logo,
+  `/credits` page, PWA manifest + shell branding, client dependency additions.
+- **M3 (in progress)** — `application/vnd.endowgpt.document` artifact type
+  (MIME, aliases, row kind, dispatch), document prompt guidance, and the
+  TipTap editor surface wired into the artifact panel.

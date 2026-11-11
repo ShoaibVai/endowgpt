@@ -23,6 +23,8 @@ export * from './reasoning';
 export * from './toolTiming';
 /* artifacts  */
 export * from './artifacts';
+/* endowGPT document artifacts */
+export * from './documents';
 /* schema helpers  */
 export * from './parsers';
 /* custom/dynamic configurations  */

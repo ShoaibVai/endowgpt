@@ -31,6 +31,19 @@ import * as config from './config';
 import request from './request';
 import * as s from './schemas';
 import * as r from './roles';
+import * as documents from './documents';
+
+/** endowGPT document artifact endpoints ride the same service object so the
+ *  client's `dataService.getDocuments`-style surface stays single. */
+export const {
+  getDocuments,
+  getDocument,
+  upsertDocument,
+  deleteDocument,
+  getDocumentVersion,
+  restoreDocumentVersion,
+  aiEditDocument,
+} = documents;
 
 export function getInsights(params: TInsightsParams = {}): Promise<TInsightsResponse> {
   const query = new URLSearchParams();

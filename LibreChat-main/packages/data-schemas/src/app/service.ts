@@ -3,6 +3,7 @@ import {
   EModelEndpoint,
   chatProjectsConfigSchema,
   configSchema,
+  documentsConfigSchema,
   filtersConfigSchema,
   conversationListConfigSchema,
   toolCallPreviewsConfigSchema,
@@ -202,6 +203,7 @@ export const AppService = async (params?: {
   const registration = config.registration ?? configDefaults.registration;
   const emailChange = config.emailChange;
   const interfaceConfig = await loadDefaultInterface({ config, configDefaults });
+  const documents = documentsConfigSchema.parse(config.documents ?? {});
   const projects = chatProjectsConfigSchema.parse(config.projects ?? {});
   const turnstileConfig = loadTurnstileConfig(config, configDefaults);
   const speech = config.speech;
@@ -242,6 +244,7 @@ export const AppService = async (params?: {
     availableTools,
     imageOutputType,
     interfaceConfig,
+    documents,
     turnstileConfig,
     mcpConfig: mcpServersConfig,
     fileStrategies: config.fileStrategies,

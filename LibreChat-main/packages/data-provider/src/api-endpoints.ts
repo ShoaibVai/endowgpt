@@ -81,6 +81,21 @@ export const messages = (params: q.MessagesListParams) => {
 
 export const messagesArtifacts = (messageId: string) => `${messagesRoot}/artifact/${messageId}`;
 
+/** endowGPT document artifacts (Mongo-backed, TipTap editor). */
+const documentsRoot = `${BASE_URL}/api/documents`;
+export const documents = () => documentsRoot;
+export const documentPath = (conversationId: string, artifactId: string) =>
+  `${documentsRoot}/${encodeURIComponent(conversationId)}/${encodeURIComponent(artifactId)}`;
+export const documentVersionPath = (
+  conversationId: string,
+  artifactId: string,
+  versionId: string,
+) =>
+  `${documentPath(conversationId, artifactId)}/versions/${encodeURIComponent(versionId)}`;
+export const documentRestorePath = (conversationId: string, artifactId: string) =>
+  `${documentPath(conversationId, artifactId)}/restore`;
+export const documentAiEditPath = () => `${documentsRoot}/ai-edit`;
+
 /** The child calls of a stored message's subagent transcripts that the given files belong to. */
 export const messageSubagentAttachmentCalls = ({
   conversationId,

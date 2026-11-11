@@ -32,6 +32,10 @@ export enum QueryKeys {
   presets = 'presets',
   searchResults = 'searchResults',
   startupConfig = 'startupConfig',
+  /* endowGPT document artifacts (queries) */
+  documents = 'documents',
+  document = 'document',
+  documentVersionContent = 'documentVersionContent',
   insights = 'insights',
   insightsAccess = 'insightsAccess',
   assistants = 'assistants',
@@ -196,8 +200,13 @@ export enum MutationKeys {
   deleteSkillNode = 'deleteSkillNode',
   updateSkillNodeContent = 'updateSkillNodeContent',
   /** Artifact code save, keyed so the editor pane can see a save started by
-   *  another instance of itself — the pane is remounted when it changes hosts. */
+   *  another instance of itself - the pane is remounted when it changes hosts. */
   editArtifact = 'editArtifact',
+  /* endowGPT document artifacts (mutations) */
+  documentSave = 'documentSave',
+  documentRestore = 'documentRestore',
+  documentDelete = 'documentDelete',
+  documentAiEdit = 'documentAiEdit',
   convoPin = 'convoPin',
   archiveAllConversations = 'archiveAllConversations',
   createSchedule = 'createSchedule',

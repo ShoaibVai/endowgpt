@@ -8,6 +8,8 @@ export * from './acl/search';
 export * from './credentials';
 /* Artifacts */
 export * from './artifacts';
+/* endowGPT document artifacts */
+export * from './documents';
 /* Admin */
 export * from './admin';
 export * from './cdn';

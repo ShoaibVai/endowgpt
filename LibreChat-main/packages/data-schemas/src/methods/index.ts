@@ -1,4 +1,6 @@
 import { createSubagentContentMethods, type SubagentContentMethods } from './subagentContent';
+import { createDocumentMethods } from './document';
+import type { DocumentMethods } from './document';
 export type {
   SubagentContentScope,
   SubagentContentHead,
@@ -289,6 +291,7 @@ export type AllMethods = SubagentContentMethods &
   FileStorageMethods &
   MemoryMethods &
   ToolFavoriteMethods &
+  DocumentMethods &
   AgentCategoryMethods &
   AgentApiKeyMethods &
   MCPServerMethods &
@@ -534,6 +537,7 @@ export function createMethods(
     ...createFileStorageMethods(mongoose),
     ...createMemoryMethods(mongoose),
     ...createToolFavoriteMethods(mongoose),
+    ...createDocumentMethods(mongoose),
     ...createAgentCategoryMethods(mongoose),
     ...createAgentApiKeyMethods(mongoose),
     ...createMCPServerMethods(mongoose, {

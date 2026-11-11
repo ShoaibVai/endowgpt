@@ -23,7 +23,9 @@ import { getCodeBlockFilename } from './downloadFile';
 const artifactFilename = {
   'application/vnd.react': 'App.tsx',
   'text/html': 'index.html',
-  /* Office preview buckets — the backend produces a complete sanitized
+  /* endowGPT document artifacts are Markdown edited in the TipTap panel */
+  'application/vnd.endowgpt.document': 'document.md',
+  /* Office preview buckets - the backend produces a complete sanitized
    * `index.html` document (head + body) and ships it via `attachment.text`.
    * The Sandpack `static` template loads it as-is. See
    * `packages/api/src/files/documents/html.ts`. */
@@ -54,7 +56,11 @@ const artifactTemplate: Record<
   'text/html': 'static',
   'application/vnd.react': 'react-ts',
   'application/vnd.mermaid': 'react-ts',
-  /* CODE bucket reuses the static markdown pipeline — `useArtifactProps`
+  /* The DOCUMENT bucket is edited by the TipTap document editor; the
+   * `static` template value keeps the map total for callers that look
+   * types up before the editor route dispatches. */
+  'application/vnd.endowgpt.document': 'static',
+  /* CODE bucket reuses the static markdown pipeline - `useArtifactProps`
    * pre-wraps the content in a fenced block and hands it to
    * `getMarkdownFiles`, so the rendered HTML uses the same `marked`
    * pipeline as `.md` artifacts. Keeping `static` (vs. `react-ts`) means
@@ -291,6 +297,9 @@ const dependenciesMap: Record<
   'application/vnd.mermaid': mermaidDependencies,
   'application/vnd.react': standardDependencies,
   'text/html': standardDependencies,
+  /* The DOCUMENT bucket is edited client-side by the TipTap editor; the
+   * panel never sandpack-boots it (see DocumentArtifactTabs dispatch). */
+  'application/vnd.endowgpt.document': {},
   /* CODE renders in the static markdown template; no React or other
    * runtime deps. Empty map skips the sandpack `package.json` install
    * step entirely (same as MARKDOWN/PLAIN_TEXT). */
@@ -437,6 +446,11 @@ export const TOOL_ARTIFACT_TYPES = {
   MERMAID: MERMAID_ARTIFACT_TYPE,
   PLAIN_TEXT: 'text/plain',
   CODE: 'application/vnd.code',
+  /** endowGPT document artifact: Markdown edited in the TipTap panel. The
+   *  full MIME (not a bare `document` alias) keeps it out of the generic
+   *  preview path while `ARTIFACT_TYPE_ALIASES` still accepts the short
+   *  names a model may write. */
+  DOCUMENT: 'application/vnd.endowgpt.document',
   /* Office-format rich previews. The backend renders the binary file as a
    * complete sanitized HTML document and ships it via `attachment.text`;
    * the client routes these types through the Sandpack `static` template's
@@ -562,6 +576,8 @@ const ARTIFACT_TYPE_ALIASES: Record<string, string> = {
   md: TOOL_ARTIFACT_TYPES.MARKDOWN,
   mermaid: TOOL_ARTIFACT_TYPES.MERMAID,
   svg: 'image/svg+xml',
+  document: TOOL_ARTIFACT_TYPES.DOCUMENT,
+  doc: TOOL_ARTIFACT_TYPES.DOCUMENT,
 };
 
 const CANONICAL_ARTIFACT_TYPES: ReadonlySet<string> = new Set<string>([
@@ -599,6 +615,14 @@ const ARTIFACT_ROW_KINDS: Record<string, ArtifactRowKind> = {
     label: { key: 'com_ui_artifact_format_diagram' },
     rendersPreview: true,
     fallbackGlyph: 'diagram',
+  },
+  [TOOL_ARTIFACT_TYPES.DOCUMENT]: {
+    lang: 'markdown',
+    label: { key: 'com_ui_artifact_format_document' },
+    /* The document editor renders (and edits) the content itself; the
+     * Markdown/code tab stays available through the tabs panel. */
+    rendersPreview: true,
+    fallbackGlyph: 'document',
   },
   [TOOL_ARTIFACT_TYPES.DOCX]: {
     lang: '',

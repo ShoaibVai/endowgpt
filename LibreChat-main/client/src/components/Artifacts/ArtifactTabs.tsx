@@ -6,13 +6,15 @@ import type { editor } from 'monaco-editor';
 import type { ProcessedMermaidSvg } from '~/utils/diagram/export';
 import { MermaidRenderer } from '~/components/Messages/Content/Mermaid/Mermaid';
 import { MERMAID_ARTIFACT_TYPE, type Artifact } from '~/common/artifacts';
+import { ArtifactCodeEditor } from './ArtifactCodeEditor';
 import { useArtifactCode } from '~/Providers/EditorContext';
 import { normalizeArtifactType } from '~/utils/artifacts';
-import { ArtifactCodeEditor } from './ArtifactCodeEditor';
+import { TOOL_ARTIFACT_TYPES } from '~/utils/artifacts';
 import { lazyWithRecovery } from '~/lib/assets/lazy';
 import { useLocalize } from '~/hooks';
 
 const SandboxArtifactTabs = lazyWithRecovery(() => import('./SandboxArtifactTabs'));
+const DocumentTabs = lazyWithRecovery(() => import('./Document'));
 
 interface ArtifactTabsProps {
   artifact: Artifact;
@@ -85,14 +87,25 @@ function MermaidArtifactTabs({
   );
 }
 
+/** endowGPT document artifacts load after the TipTap editor module; shared
+ *  panel chrome (copy, download, versions) is unchanged because Artifacts
+ *  renders around these tabs. */
 export default function ArtifactTabs(props: ArtifactTabsProps) {
-  if (normalizeArtifactType(props.artifact.type ?? '') === MERMAID_ARTIFACT_TYPE) {
+  const artifactType = normalizeArtifactType(props.artifact.type ?? '');
+  if (artifactType === MERMAID_ARTIFACT_TYPE) {
     return (
       <MermaidArtifactTabs
         artifact={props.artifact}
         isSharedConvo={props.isSharedConvo}
         onMermaidExportReady={props.onMermaidExportReady}
       />
+    );
+  }
+  if (artifactType === TOOL_ARTIFACT_TYPES.DOCUMENT) {
+    return (
+      <Suspense fallback={<LoadingArtifactTabs />}>
+        <DocumentTabs artifact={props.artifact} isSharedConvo={props.isSharedConvo} />
+      </Suspense>
     );
   }
 

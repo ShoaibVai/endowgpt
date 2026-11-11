@@ -1,0 +1,95 @@
+/*
+endow-document.css — endowGPT document-related CSS. Everything here is
+genuinely local (markdown body metrics for the TipTap surface), not semantic
+theming: brand colors live in the deployment theme (librechat.yaml) and the
+components themselves use shared theme-token classes.
+*/
+
+/* The TipTap surface writes plain HTML; give its elements the same beat as the
+ * chat markdown renderer (spacing, table borders, code fences) without
+ * importing the prose stack twice. */
+.endow-document-content {
+  outline: none;
+  line-height: 1.6;
+}
+
+.endow-document-content p {
+  margin: 0.5rem 0;
+}
+
+.endow-document-content h1,
+.endow-document-content h2,
+.endow-document-content h3 {
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.endow-document-content ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.endow-document-content ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.endow-document-content table {
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  width: 100%;
+}
+
+.endow-document-content th,
+.endow-document-content td {
+  border: 1px solid var(--fallback-color-border-light, #b4b4b4);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+}
+
+.endow-document-content th {
+  font-weight: 600;
+}
+
+.endow-document-content pre.endow-code,
+.endow-document-content code {
+  font-family: var(--font-code-mono, monospace);
+}
+
+.endow-document-content pre.endow-code {
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.endow-document-content blockquote {
+  border-inline-start: 3px solid var(--fallback-color-border-light, #b4b4b4);
+  padding-inline-start: 0.75rem;
+  margin: 0.75rem 0;
+  color: var(--text-secondary, #b4b4b4);
+}
+
+.endow-document-content a {
+  text-decoration: underline;
+}
+
+.endow-document-content ins[data-endow-suggestion='insert'] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #24d5d0;
+}
+
+.endow-document-content del[data-endow-suggestion='delete'] {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #f1352a;
+  opacity: 0.6;
+}
+
+.endow-document-content .endow-suggestion-toolbar {
+  display: flex;
+  gap: 0.25rem;
+}

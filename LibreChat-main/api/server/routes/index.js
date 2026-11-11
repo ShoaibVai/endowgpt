@@ -1,4 +1,5 @@
 const accessPermissions = require('./accessPermissions');
+const documents = require('./documents');
 const assistants = require('./assistants');
 const categories = require('./categories');
 const adminAuth = require('./admin/auth');
@@ -46,6 +47,7 @@ const rum = require('./rum');
 const insights = require('./insights');
 
 module.exports = {
+  documents,
   pullRequests,
   insights,
   rum,
