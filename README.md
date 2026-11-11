@@ -18,6 +18,16 @@ top: one compose file, one env file, and a curated model configuration.
 Prerequisites: Docker Desktop (or Engine + Compose v2) and, to run the model smoke
 test, Node 20+ in the shell.
 
+On Windows, double-click (or run in a terminal):
+
+```bat
+start.bat   rem copies .env.example to .env on first run, waits for /health,
+            rem prints http://localhost:3080 when ready; start.bat --build rebuilds
+stop.bat    rem stops the stack, keeps all data; stop.bat --wipe deletes volumes
+```
+
+Cross-platform equivalent:
+
 ```sh
 cp .env.example .env          # then fill in the values listed inside
 docker compose up -d --build  # first run builds LibreChat and the RAG API

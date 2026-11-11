@@ -13,6 +13,7 @@ theme tokens, copy via `useLocalize()`).
 ## Native (endowGPT) files
 
 - `docker-compose.yml` — the full product stack (build both upstream trees).
+- `start.bat`, `stop.bat` — one-click Windows start/stop for the stack (`--build` rebuilds, `--wipe` deletes data).
 - `.env.example`, `.env` (local only) — environment template with every variable documented.
 - `.gitignore`, `LICENSES.md` — repo hygiene and upstream license notices.
 - `PLAN.md`, `README.md`, `REPORT.md` — design of record, ops guide, closing report.
