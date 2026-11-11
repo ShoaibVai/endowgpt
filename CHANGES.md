@@ -76,7 +76,6 @@ theme tokens, copy via `useLocalize()`).
 | `client/src/components/Artifacts/Document/aiSelection.tsx` | M5 | floating selection toolbar: rewrite/expand/shorten/grammar/translate, tone submenu, inline Ask AI instruction |
 | `client/src/components/Artifacts/Document/diff.ts` | M5 | word-level diff + meaningful-change guard (unit-tested) |
 | `client/src/components/Artifacts/Document/suggestionActions.ts` | M5 | accept/reject rebuild of the marked range in one transaction |
-| `client/src/components/Artifacts/Document/suggestion.css` | M5 | insert/delete mark presentation only |
 | `client/src/components/Artifacts/Document/DocumentPage.tsx` | M5 | `/documents/:conversationId/:artifactId` full-page editor |
 | `client/src/components/Artifacts/Document/DocumentsList.tsx` | M5 | `/documents` index of store-backed documents |
 | `client/src/components/Artifacts/Document/store.ts` | M5 | feature-owned Jotai atoms (pending suggestion, versions) |

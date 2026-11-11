@@ -492,18 +492,10 @@ export default function DocumentArtifactTabs({
           <span className="text-text-secondary px-1 text-xs">
             {localize('com_ui_suggestion_review')}
           </span>
-          <Button
-            size="sm"
-            variant="submit"
-            onClick={handleAcceptSuggestion}
-          >
+          <Button size="sm" variant="submit" onClick={handleAcceptSuggestion}>
             {localize('com_ui_suggestion_accept')}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleRejectSuggestion}
-          >
+          <Button size="sm" variant="ghost" onClick={handleRejectSuggestion}>
             {localize('com_ui_suggestion_reject')}
           </Button>
           <Button

@@ -74,7 +74,7 @@ and its RAG API.
 | Anonymous shell: endowGPT title, favicons, no LibreChat branding | PASS |
 | `/api/documents` mounted, 401 unauthenticated | PASS |
 | Authenticated register/login → model specs with artifacts+fileSearch | PASS |
-| documents upsert / fresh-base update / stale-base 409 / restore / list | PASS (after live fix) |
+| documents upsert / fresh-base update / stale-base 409 / restore / list | PASS (verified live against the running stack) |
 | ai-edit: unknown model → 400; upstream 429 → coded `ai_edit_rate_limited` | PASS |
 | Model smoke (both models, direct to OpenCode) | SKIP — key authenticated, but the upstream free-tier usage quota is exhausted (HTTP 429 `FreeUsageLimitError`, ~18h reset). The wiring itself is proven by the auth pass and the app's mapped error. |
 | Client typecheck (`tsc --noEmit`) | PASS (0 errors in touched code) |

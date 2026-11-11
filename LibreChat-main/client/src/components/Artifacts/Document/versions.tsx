@@ -92,7 +92,10 @@ export default function VersionsDrawer({
                   </div>
                 ) : (
                   <pre className="text-text-secondary max-h-40 overflow-y-auto text-xs whitespace-pre-wrap">
-                    {(versionPreview as TDocumentVersionContent | undefined)?.content?.slice(0, 600)}
+                    {(versionPreview as TDocumentVersionContent | undefined)?.content?.slice(
+                      0,
+                      600,
+                    )}
                   </pre>
                 )}
                 <Button
