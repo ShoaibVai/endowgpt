@@ -1,0 +1,208 @@
+# endowGPT web search overlay.
+#
+# Usage (from the repo root):
+#   docker compose -f docker-compose.yml -f docker-compose.websearch.yml up -d
+#
+# Profiles:
+#   pagesift  - default scraper (PageSift, Firecrawl v1/v2 compatible). Selected
+#               through COMPOSE_PROFILES=pagesift in .env.
+#   crw       - alternative scraper (CRW). Both scrapers listen on 3002 and use
+#               the network alias "scraper", so switching is only a profile
+#               change: COMPOSE_PROFILES=crw.
+#   js-render - opt-in LightPanda CDP sidecar for CRW. OFF by default.
+#
+# The core compose file remains the entry point; this file only adds services,
+# networks and the API network membership.
+#
+# No service here publishes a host port. For local development use
+# docker-compose.dev.yml, which publishes loopback-only ports.
+
+name: endowgpt
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # LibreChat must reach searxng:8080 and scraper:3002. It keeps the default
+  # network for MongoDB, Meilisearch, RAG API and pgvector.
+  api:
+    networks:
+      - default
+      - websearch
+
+  # ---------------------------------------------------------------- SearXNG
+  searxng:
+    image: searxng/searxng:2026.11.11-248b8ffc0
+    container_name: endowgpt-searxng
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET must be set in .env}
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_LIMITER: "false"
+      SEARXNG_IMAGE_PROXY: "false"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - websearch
+    mem_limit: ${SEARXNG_MEM_LIMIT:-512m}
+    cpus: ${SEARXNG_CPUS:-0.5}
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  # ------------------------------------------------------- PageSift scraper
+  # Default profile: COMPOSE_PROFILES=pagesift in .env.
+  scraper-pagesift:
+    profiles: ["pagesift"]
+    image: ghcr.io/yolow92/pagesift:1.2.6
+    container_name: endowgpt-scraper
+    restart: unless-stopped
+    environment:
+      PAGESIFT_API_KEYS: ${SCRAPER_API_KEY:?SCRAPER_API_KEY must be set in .env}
+      PAGESIFT_DATA_DIR: /data
+      PAGESIFT_CONFIG: /etc/pagesift/pagesift.toml
+      PAGESIFT_LOG: info
+      PAGESIFT_LOG_FORMAT: json
+      # The image bundles LightPanda; keep telemetry off.
+      LIGHTPANDA_DISABLE_TELEMETRY: "true"
+    volumes:
+      - ./pagesift/pagesift.toml:/etc/pagesift/pagesift.toml:ro
+      - pagesift-data:/data
+    networks:
+      websearch:
+        aliases:
+          - scraper
+      render: {}
+    mem_limit: ${SCRAPER_MEM_LIMIT:-768m}
+    cpus: ${SCRAPER_CPUS:-1.0}
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      # The image is Debian slim: no curl/wget. Bash's /dev/tcp is enough for
+      # a liveness probe and does not depend on the private-network SSRF guard.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3002' 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  # ------------------------------------------------------------- CRW scraper
+  # Enable with COMPOSE_PROFILES=crw. Same port and alias as PageSift.
+  scraper-crw:
+    profiles: ["crw"]
+    image: ghcr.io/fastcrw/crw:0.43.2
+    container_name: endowgpt-scraper-crw
+    restart: unless-stopped
+    environment:
+      CRW_SERVER__HOST: 0.0.0.0
+      CRW_SERVER__PORT: "3002"
+      CRW_AUTH__API_KEYS: '["${SCRAPER_API_KEY:?SCRAPER_API_KEY must be set in .env}"]'
+      # JS rendering is opt-in. Enable the js-render profile and set
+      # CRW_RENDERER_MODE=lightpanda in .env to use the sidecar.
+      CRW_RENDERER__MODE: ${CRW_RENDERER_MODE:-none}
+      CRW_RENDERER__LIGHTPANDA__WS_URL: ws://lightpanda:9222
+      CRW_CRAWLER__MAX_CONCURRENCY: "4"
+      CRW_CRAWLER__REQUESTS_PER_SECOND: "2.0"
+      CRW_CRAWLER__RESPECT_ROBOTS_TXT: "true"
+      CRW_CRAWLER__USER_AGENT: "endowGPT-scraper/1.0 (+https://endowgpt.com/bot)"
+      HOME: /tmp
+      RUST_LOG: crw_server=info,crw_renderer=warn
+    networks:
+      websearch:
+        aliases:
+          - scraper
+      render: {}
+    mem_limit: ${SCRAPER_MEM_LIMIT:-768m}
+    cpus: ${SCRAPER_CPUS:-1.0}
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3002' 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+  # ------------------------------------------- Optional JS rendering sidecar
+  # Only for CRW testing. PageSift already bundles LightPanda.
+  lightpanda:
+    profiles: ["js-render"]
+    image: lightpanda/browser:1.0.3
+    container_name: endowgpt-lightpanda
+    restart: unless-stopped
+    # The official image entrypoint is tini; the command must be the full
+    # binary path. Keep the CDP server bound inside the Docker networks and
+    # block private/link-local targets at the browser.
+    command:
+      - "/bin/lightpanda"
+      - "serve"
+      - "--host"
+      - "0.0.0.0"
+      - "--advertise-host"
+      - "lightpanda"
+      - "--port"
+      - "9222"
+      - "--block-private-networks"
+    environment:
+      LIGHTPANDA_DISABLE_TELEMETRY: "true"
+      HOME: /tmp
+    networks:
+      - render
+      - egress
+    mem_limit: ${JS_RENDER_MEM_LIMIT:-256m}
+    cpus: ${JS_RENDER_CPUS:-0.5}
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9222' 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+
+networks:
+  # Shared only by api, searxng and the active scraper. No data service joins it.
+  websearch:
+    name: endowgpt_websearch
+  # Scraper <-> sidecar control plane. internal: no route off the host.
+  render:
+    name: endowgpt_websearch_render
+    internal: true
+  # Sidecar-only internet egress. No data service joins it.
+  egress:
+    name: endowgpt_websearch_egress
+
+volumes:
+  # PageSift cache, job records and quota data. CRW is stateless.
+  pagesift-data:

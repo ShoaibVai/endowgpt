@@ -1,0 +1,30 @@
+# Local development only: publish web-search ports on loopback.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.websearch.yml \
+#     -f docker-compose.dev.yml up -d
+#
+# Production (VPS) never uses this file. No service here binds 0.0.0.0.
+
+name: endowgpt
+
+services:
+  searxng:
+    ports:
+      - "127.0.0.1:${SEARXNG_HOST_PORT:-8080}:8080"
+
+  scraper-pagesift:
+    profiles: ["pagesift"]
+    ports:
+      - "127.0.0.1:${SCRAPER_HOST_PORT:-3002}:3002"
+
+  # Distinct host port because both scraper services are defined in the merged
+  # model; only the active profile publishes.
+  scraper-crw:
+    profiles: ["crw"]
+    ports:
+      - "127.0.0.1:${CRW_HOST_PORT:-3003}:3002"
+
+  lightpanda:
+    profiles: ["js-render"]
+    ports:
+      - "127.0.0.1:${LIGHTPANDA_HOST_PORT:-9222}:9222"
