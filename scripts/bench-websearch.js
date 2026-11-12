@@ -16,7 +16,7 @@
  *
  * VPS (no published web-search ports), run on the websearch network:
  *   docker run --rm --network endowgpt_websearch \
- *     -v "$PWD/scripts:/scripts:ro" -v "$PWD:/work:ro" -w /work \
+ *     -v "$PWD/scripts:/scripts:ro" -v "$PWD:/work" -w /work \
  *     -e SEARXNG_URL=http://searxng:8080 \
  *     -e SCRAPER_URL=http://scraper:3002 \
  *     -e SCRAPER_KEY="$SCRAPER_API_KEY" \
