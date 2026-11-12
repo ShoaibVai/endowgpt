@@ -1,0 +1,16 @@
+# VPS-only override: expose LibreChat on loopback so the reverse proxy is the
+# only public entry point. Apply last:
+#
+#   docker compose -f docker-compose.yml \
+#     -f docker-compose.websearch.yml \
+#     -f docker-compose.vps.yml up -d
+#
+# `!override` replaces the base compose port mapping instead of appending to
+# it. Without it, the base `0.0.0.0:3080` mapping would remain.
+
+name: endowgpt
+
+services:
+  api:
+    ports: !override
+      - "127.0.0.1:${PORT:-3080}:${PORT:-3080}"
