@@ -230,10 +230,7 @@ export class LibreOfficeConversionError extends Error {
  *   - `LibreOfficeConversionError` for subprocess failures, timeout, or
  *     oversized output
  */
-async function convertWithLibreOffice(
-  buffer: Buffer,
-  extensionHint: string,
-): Promise<Buffer> {
+async function convertWithLibreOffice(buffer: Buffer, extensionHint: string): Promise<Buffer> {
   const probe = await probeLibreOfficeBinary();
   if (!probe.available || !probe.binary) {
     throw new LibreOfficeUnavailableError(probe.reason ?? 'LibreOffice binary unavailable');
