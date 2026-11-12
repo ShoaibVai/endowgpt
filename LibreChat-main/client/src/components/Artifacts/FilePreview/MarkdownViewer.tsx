@@ -49,11 +49,11 @@ export default function MarkdownViewer({ userId, fileId, shareId }: MarkdownView
     }
   };
 
-  if (isLoading || (blob != null && !loaded && !isError && !readError)) {
-    return <PreviewSkeleton rows={8} />;
-  }
   if (isError || readError) {
     return <PreviewError onRetry={retry} />;
+  }
+  if (isLoading || blob == null || !loaded) {
+    return <PreviewSkeleton rows={8} />;
   }
 
   return (
