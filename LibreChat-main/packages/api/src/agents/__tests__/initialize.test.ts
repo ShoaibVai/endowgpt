@@ -116,6 +116,7 @@ jest.mock('~/files', () => ({
 jest.mock('~/prompts', () => ({
   documentsPrompt: 'Document guidance',
   filesPrompt: 'File guidance',
+  webSearchPrompt: 'Web search guidance',
 }));
 
 jest.mock('../resources', () => ({
@@ -1289,7 +1290,7 @@ describe('initializeAgent: ChatProject context', () => {
     );
 
     expect(result.additional_instructions).toBe(
-      'Auxiliary Agent guidance.\n\nDocument guidance\n\nFile guidance',
+      'Auxiliary Agent guidance.\n\nDocument guidance\n\nFile guidance\n\nWeb search guidance',
     );
     expect(result.additional_instructions).not.toContain('Project guidance');
     expect(result.tool_resources).toBeUndefined();
@@ -2215,7 +2216,7 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
 
     expect(result.instructions).toBeUndefined();
     expect(result.additional_instructions).toBe(
-      'Today is 2026-08-31 (Monday). The turn began at 2026-08-31 06:20:00 +00:00 (Monday) (2026-08-31T06:20:00.000Z).\n\nDocument guidance\n\nFile guidance',
+      'Today is 2026-08-31 (Monday). The turn began at 2026-08-31 06:20:00 +00:00 (Monday) (2026-08-31T06:20:00.000Z).\n\nDocument guidance\n\nFile guidance\n\nWeb search guidance',
     );
   });
 
@@ -2240,7 +2241,7 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
 
     expect(result.instructions).toBeUndefined();
     expect(result.additional_instructions).toBe(
-      'It is currently 2024-01-15 13:30:00 -05:00 (Monday).\n\nDocument guidance\n\nFile guidance',
+      'It is currently 2024-01-15 13:30:00 -05:00 (Monday).\n\nDocument guidance\n\nFile guidance\n\nWeb search guidance',
     );
   });
 
@@ -2263,7 +2264,9 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
     );
 
     expect(result.instructions).toBe('You are helping Test User.');
-    expect(result.additional_instructions).toBe('Document guidance\n\nFile guidance');
+    expect(result.additional_instructions).toBe(
+      'Document guidance\n\nFile guidance\n\nWeb search guidance',
+    );
   });
 
   it('keeps native file tools and file guidance in the initialized agent', async () => {
@@ -2315,7 +2318,7 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
     );
 
     expect(result.additional_instructions).toBe(
-      'Existing dynamic\n\nDocument guidance\n\nFile guidance',
+      'Existing dynamic\n\nDocument guidance\n\nFile guidance\n\nWeb search guidance',
     );
   });
 });

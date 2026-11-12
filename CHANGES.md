@@ -40,6 +40,10 @@ sandbox.
 | Legacy data             | Old HTML/React/code artifact conversations keep readable fenced content; they do not crash or reopen a panel.                                                                                                                                                                                                                                 |
 | Spreadsheet preview     | The viewer reads its CSS modules by their real `spreadsheet-*` keys; workbook-driven column widths now render as side-by-side columns instead of a single stacked column.                                                                                                                                                                     |
 | File preview scrolling  | Spreadsheet, DOCX, Markdown, PDF, and legacy text previews share a `preview-scroll` container with a full-size 8px horizontal/vertical thumb and track, so wide sheets and long documents have an obvious scrollbar.                                                                                                                          |
+| Web search              | `webSearch: true` on the model spec puts `web_search` in every normal chat; `webSearchPrompt` tells the model to use it for current/live questions and to cite sources. `start.bat`/`stop.bat` now include the websearch overlay so SearXNG, the scraper, and the API's search environment exist on every launch. The composer stays minimal rather than restoring the developer tool palette. |
+| HTML preview            | `html`/`htm` code fences get a Preview/Code toggle in the code bar. Preview reads the highlighted code block's DOM text and renders it in a sandboxed `iframe` (`allow-scripts`, no same-origin) while copy/download keep working against the hidden source. |
+| Message spacing         | Generated-file card groups and tool-output artifact groups use `gap-3`, so consecutive files no longer touch.                                                                                                                                                                                                                                  |
+| Login logo              | The auth lockup uses `max-h-20` instead of `max-h-16`, preserving the 1410/286 aspect ratio instead of cropping the wordmark vertically.                                                                                                                                                                                                       |
 
 ## Core edits (LibreChat upstream)
 
@@ -203,6 +207,13 @@ LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
   that rode along with suggestion spans (now only the suggestion marks are
   stripped). Final report in `REPORT.md`; branding sweep and README ops guide
   finished.
+- **M9.3** — restored web search and HTML preview: the model spec enables
+  `web_search` everywhere, `webSearchPrompt` covers live/current questions and
+  citations, HTML code fences gain a sandboxed Preview/Code toggle that reads
+  the highlighted DOM text, generated file cards get 12px spacing, and the auth
+  lockup no longer crops vertically. The Windows launchers now include the
+  websearch overlay, which is what supplies the API's SearXNG/scraper
+  environment and network membership.
 - **M9.2** — file-preview scrolling: the app-wide horizontal scrollbar is a
   near-invisible `0.1em`; generated-file viewers now use a shared
   `preview-scroll` class with an 8px thumb/track, including the spreadsheet's

@@ -1,9 +1,9 @@
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
+import { logoPaths, logoCropStyle } from '~/components/Brand/logos';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
 import { hasPublishedPolicies } from '~/utils/policies';
 import { TranslationKeys, useLocalize } from '~/hooks';
-import { logoPaths, logoCropStyle } from '~/components/Brand/logos';
 import SocialLoginRender from './SocialLoginRender';
 import { BlinkAnimation } from './BlinkAnimation';
 import LegalConsent from './LegalConsent';
@@ -98,8 +98,9 @@ function AuthLayout({
               crop via object-fit (constants in components/Brand/logos.ts). */}
           <img
             src={logoPaths.lockup('onlight')}
+            // eslint-disable-next-line shadcn/no-inline-styles
             style={logoCropStyle}
-            className="dark:hidden max-h-16 w-full max-w-sm"
+            className="max-h-20 w-full max-w-sm dark:hidden"
             alt={localize('com_ui_logo', {
               0: startupConfig?.appTitle ?? 'endowGPT',
             })}
@@ -107,8 +108,9 @@ function AuthLayout({
           <img
             src={logoPaths.lockup('ondark')}
             aria-hidden="true"
+            // eslint-disable-next-line shadcn/no-inline-styles
             style={logoCropStyle}
-            className="hidden dark:block max-h-16 w-full max-w-sm"
+            className="hidden max-h-20 w-full max-w-sm dark:block"
             alt=""
           />
         </div>

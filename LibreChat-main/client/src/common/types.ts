@@ -32,6 +32,8 @@ export type CodeBarProps = {
   plugin?: boolean;
   blockIndex?: number;
   allowExecution?: boolean;
+  previewActive?: boolean;
+  onTogglePreview?: () => void;
   codeRef: RefObject<HTMLElement>;
 };
 

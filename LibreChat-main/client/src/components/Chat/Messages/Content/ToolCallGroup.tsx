@@ -732,7 +732,7 @@ export default function ToolCallGroup({
               <FailedRevealContext.Provider value={revealValue}>
                 <LoneGroupContext.Provider value={count === 1}>
                   <SoleToolContext.Provider value={phaseSole ?? count === 1}>
-                    <div className="flex flex-col py-0.5">
+                    <div className="flex flex-col gap-3 py-0.5">
                       {parts.map(({ part, idx }, partIndex) => {
                         if (part.type === ContentTypes.THINK) {
                           const think = part.think;

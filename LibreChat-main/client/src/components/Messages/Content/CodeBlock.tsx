@@ -32,6 +32,8 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
   const codeBarRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isCodeBarVisible, setIsCodeBarVisible] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
 
   const toolCallsMap = useToolCallsMapContext();
   const { messageId, partIndex } = useMessageContext();
@@ -96,7 +98,19 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
 
   const isNonCode = !!(plugin === true || error === true);
   const language = isNonCode ? 'json' : lang;
+  const isHtml = !isNonCode && (language === 'html' || language === 'htm');
+  const showHtmlPreview = isHtml && showPreview;
   const showFloating = isHovered && !isCodeBarVisible;
+
+  /** Syntax highlighting hands us React elements, so the DOM's own text is the
+   *  only faithful source for the preview. Read it when the preview opens,
+   *  while the code panel is still in the document. */
+  const togglePreview = useCallback(() => {
+    if (!showPreview) {
+      setPreviewHtml(codeRef.current?.textContent ?? '');
+    }
+    setShowPreview((active) => !active);
+  }, [showPreview]);
 
   return (
     <div
@@ -115,9 +129,28 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
           blockIndex={blockIndex}
           plugin={plugin === true}
           allowExecution={allowExecution}
+          previewActive={showPreview}
+          onTogglePreview={isHtml ? togglePreview : undefined}
         />
       </div>
-      <div dir="ltr" className={cn(classProp, 'bg-surface-code-body overflow-y-auto p-4')}>
+      {showHtmlPreview && (
+        <iframe
+          title={localize('com_ui_preview')}
+          srcDoc={previewHtml}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          className="bg-surface-primary h-[24rem] w-full border-0"
+          data-testid="html-code-preview"
+        />
+      )}
+      <div
+        dir="ltr"
+        className={cn(
+          classProp,
+          'bg-surface-code-body overflow-y-auto p-4',
+          showHtmlPreview && 'hidden',
+        )}
+      >
         <code
           ref={codeRef}
           className={cn(

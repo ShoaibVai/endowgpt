@@ -565,7 +565,10 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
         <FileAttachmentGroup attachments={groupedFileAttachments} />
       )}
       {orderedPanel.length > 0 && (
-        <div className="my-2 flex w-full max-w-full flex-col" data-testid="artifact-row-group">
+        <div
+          className="my-2 flex w-full max-w-full flex-col gap-3"
+          data-testid="artifact-row-group"
+        >
           {orderedPanel.map(({ attachment, type }, index) => {
             if (type != null) {
               return (

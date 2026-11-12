@@ -74,6 +74,7 @@ modelSpecs:
         - "Summarize a file"
         - "Plan my week"
       fileSearch: true
+      webSearch: true
 
 # -----------------------------------------------------------------------------
 # Web search: SearXNG for discovery, a Firecrawl-compatible scraper for page

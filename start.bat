@@ -2,7 +2,10 @@
 setlocal
 rem endowGPT launcher: docker compose up -d, then wait for /health.
 rem Optional: start.bat --build   (rebuild the api/rag images first)
+rem The websearch overlay supplies SearXNG, the scraper, and the API's search
+rem environment; without it web search stays disabled.
 cd /d "%~dp0"
+set "COMPOSE=docker compose -f docker-compose.yml -f docker-compose.websearch.yml"
 
 echo [endowGPT] Checking Docker...
 docker info >nul 2>&1
@@ -33,9 +36,9 @@ set "PORT=3080"
 for /f "usebackq tokens=1,* delims==" %%a in (`findstr /B /C:"PORT=" .env`) do set "PORT=%%b"
 
 echo [endowGPT] Starting the stack (this builds the images on first run)...
-docker compose up -d %*
+%COMPOSE% up -d %*
 if errorlevel 1 (
-    echo [endowGPT] docker compose failed. Run: docker compose logs
+    echo [endowGPT] docker compose failed. Run: %COMPOSE% logs
     exit /b 1
 )
 
@@ -47,7 +50,7 @@ if not errorlevel 1 goto ready
 set /a TRIES+=1
 if %TRIES% GEQ 80 (
     echo [endowGPT] The API did not become healthy in ~4 minutes.
-    echo [endowGPT] Check: docker compose ps  /  docker compose logs -f api
+    echo [endowGPT] Check: %COMPOSE% ps  /  %COMPOSE% logs -f api
     exit /b 1
 )
 rem ping is used instead of `timeout` because timeout fails when input is
@@ -59,5 +62,5 @@ goto wait
 echo.
 echo [endowGPT] Ready: http://localhost:%PORT%
 echo [endowGPT] Services:
-docker compose ps
+%COMPOSE% ps
 exit /b 0

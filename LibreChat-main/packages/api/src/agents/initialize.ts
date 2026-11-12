@@ -128,6 +128,7 @@ import { extractAgentContent, extractSkillContent } from '../protection/adapters
 import { createConfiguredContentInspector, inspectContent } from '../protection/runtime';
 import { assertAgentAttachmentLimits, isModelBoundAttachmentFile } from './attachments';
 import { assertModelBoundContent } from '../middleware/modelBoundContent';
+import { documentsPrompt, filesPrompt, webSearchPrompt } from '~/prompts';
 import { resolveAttachedWorkspaceReadFileLines } from '~/code/workspace';
 import { isValidInstructionsPromptLink } from './instructions/linked';
 import { PARTIAL_RESOLVED_CONVERSATION } from './conversationSymbols';
@@ -144,7 +145,6 @@ import { isFatalAgentInitializationError } from './errors';
 import { assertToolOptionsWithinLimits } from './options';
 import { hasActiveFilePolicy } from '../protection/files';
 import { resolveAgentCodeExecution } from '~/code/agent';
-import { documentsPrompt, filesPrompt } from '~/prompts';
 import { hasActiveFileFieldPolicy } from '~/protection';
 import { applyBackgroundToolCalls } from './background';
 import { admitCurrentFileBudget } from './files/budget';
@@ -2635,6 +2635,7 @@ export async function initializeAgent(
 
   appendAdditionalInstructions(agent, documentsPrompt);
   appendAdditionalInstructions(agent, filesPrompt);
+  appendAdditionalInstructions(agent, webSearchPrompt);
 
   let skillCount = 0;
   /**

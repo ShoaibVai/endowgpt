@@ -1,5 +1,5 @@
 import React from 'react';
-import { InfoIcon } from 'lucide-react';
+import { Code2, Eye, InfoIcon } from 'lucide-react';
 import type { CodeBarProps } from '~/common';
 import useDownloadCode from '~/components/Messages/Content/useDownloadCode';
 import DownloadButton from '~/components/Messages/Content/DownloadButton';
@@ -10,7 +10,16 @@ import RunCode from '~/components/Messages/Content/RunCode';
 import { useLocalize } from '~/hooks';
 
 const CodeBar: React.FC<CodeBarProps> = React.memo(
-  ({ lang, error, codeRef, blockIndex, plugin = null, allowExecution = true }) => {
+  ({
+    lang,
+    error,
+    codeRef,
+    blockIndex,
+    plugin = null,
+    allowExecution = true,
+    previewActive = false,
+    onTogglePreview,
+  }) => {
     const localize = useLocalize();
     const { isCopied, handleCopy } = useCopyCode(codeRef);
     const { isDownloaded, handleDownload } = useDownloadCode(codeRef, lang);
@@ -25,6 +34,22 @@ const CodeBar: React.FC<CodeBarProps> = React.memo(
           <InfoIcon className="text-text-secondary ms-auto flex h-4 w-4 gap-2" />
         ) : (
           <div className="flex items-center justify-center gap-2">
+            {onTogglePreview != null && (
+              <button
+                type="button"
+                onClick={onTogglePreview}
+                aria-pressed={previewActive}
+                aria-label={localize(previewActive ? 'com_ui_code' : 'com_ui_preview')}
+                title={localize(previewActive ? 'com_ui_code' : 'com_ui_preview')}
+                className="text-text-secondary hover:text-text-primary focus-visible:ring-border-xheavy rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
+              >
+                {previewActive ? (
+                  <Code2 className="size-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="size-4" aria-hidden="true" />
+                )}
+              </button>
+            )}
             {allowExecution === true && (
               <RunCode lang={lang} codeRef={codeRef} blockIndex={blockIndex} />
             )}
