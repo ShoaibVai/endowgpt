@@ -30,6 +30,20 @@ jest.mock('~/server/services/Files/Code/process', () => ({
   primeFiles: (...args) => mockPrimeCodeFiles(...args),
 }));
 
+jest.mock('~/server/services/Files/Generated/process', () => ({
+  createGeneratedFilePersister: jest.fn(() => async () => ({
+    file_id: 'generated-file',
+    user: 'user',
+    bytes: 1,
+    filename: 'generated.xlsx',
+    filepath: '/uploads/user/generated.xlsx',
+    object: 'file',
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    usage: 0,
+    embedded: false,
+  })),
+}));
+
 jest.mock('@librechat/api', () => ({
   ...jest.requireActual('@librechat/api'),
   loadWebSearchAuth: (...args) => mockLoadWebSearchAuth(...args),
@@ -231,6 +245,28 @@ describe('Tool Handlers', () => {
 
       for (const tool of remainingTools) {
         expect(toolFunctions[tool.pluginKey]).toBeUndefined();
+      }
+    });
+
+    it('loads the native file-generation tools with request context', async () => {
+      const toolMap = await loadTools({
+        user: fakeUser._id,
+        tools: ['create_spreadsheet', 'create_document', 'create_presentation'],
+        returnMap: true,
+        options: {
+          req: {
+            user: { id: fakeUser._id, tenantId: 'tenant-1' },
+            config: { fileStrategy: 'local' },
+            body: { conversationId: 'convo-1', messageId: 'message-1' },
+          },
+        },
+      });
+
+      for (const name of ['create_spreadsheet', 'create_document', 'create_presentation']) {
+        expect(toolMap[name]).toBeDefined();
+        const tool = await toolMap[name]();
+        expect(tool.name).toBe(name);
+        expect(tool.responseFormat).toBe('content_and_artifact');
       }
     });
 
