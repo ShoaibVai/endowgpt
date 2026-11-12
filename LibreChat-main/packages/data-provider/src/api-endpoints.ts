@@ -90,8 +90,7 @@ export const documentVersionPath = (
   conversationId: string,
   artifactId: string,
   versionId: string,
-) =>
-  `${documentPath(conversationId, artifactId)}/versions/${encodeURIComponent(versionId)}`;
+) => `${documentPath(conversationId, artifactId)}/versions/${encodeURIComponent(versionId)}`;
 export const documentRestorePath = (conversationId: string, artifactId: string) =>
   `${documentPath(conversationId, artifactId)}/restore`;
 export const documentAiEditPath = () => `${documentsRoot}/ai-edit`;
@@ -448,11 +447,26 @@ export const fileUpload = () => `${BASE_URL}/api/files`;
 export const fileDelete = () => `${BASE_URL}/api/files`;
 export const fileDownload = (userId: string, fileId: string) =>
   `${BASE_URL}/api/files/download/${userId}/${fileId}`;
+export type FilePreviewParams = {
+  sheet?: number;
+  offset?: number;
+  limit?: number;
+};
+
 /* Deferred-preview lifecycle endpoint. Returns
- * `{ status, text?, textFormat?, previewError? }` so the frontend can
- * poll while background HTML extraction is in flight. See PR #12957. */
-export const filePreview = (fileId: string) =>
-  `${BASE_URL}/api/files/${encodeURIComponent(fileId)}/preview`;
+ * `{ status, text?, textFormat?, previewError?, sheets? }` so the frontend can
+ * poll while background extraction runs and page spreadsheets on demand. */
+export const filePreview = (fileId: string, params?: FilePreviewParams) => {
+  const search = new URLSearchParams();
+  if (params?.sheet != null) search.set('sheet', String(params.sheet));
+  if (params?.offset != null) search.set('offset', String(params.offset));
+  if (params?.limit != null) search.set('limit', String(params.limit));
+  const query = search.toString();
+  return `${BASE_URL}/api/files/${encodeURIComponent(fileId)}/preview${query ? `?${query}` : ''}`;
+};
+/** Inline PDF render for the PPTX viewer; 501 when the feature is off. */
+export const filePdfPreview = (fileId: string) =>
+  `${BASE_URL}/api/files/${encodeURIComponent(fileId)}/preview/pdf`;
 export const fileConfig = () => `${BASE_URL}/api/files/config`;
 /** Owner-scoped usage touch so queued attachments outlive the upload-window TTL. */
 export const fileUsage = () => `${BASE_URL}/api/files/usage`;
@@ -571,6 +585,16 @@ export const skillFile = (id: string, relativePath: string) =>
 
 export const insights = () => `${BASE_URL}/api/insights`;
 export const insightsAccess = () => `${insights()}/access`;
+
+/* endowGPT superadmin portal: token usage and read-only chat history */
+export const superAdmin = () => `${BASE_URL}/api/superadmin`;
+export const superAdminAccess = () => `${superAdmin()}/access`;
+export const superAdminOverview = () => `${superAdmin()}/overview`;
+export const superAdminUsers = () => `${superAdmin()}/users`;
+export const superAdminUserConversations = (userId: string) =>
+  `${superAdminUsers()}/${encodeURIComponent(userId)}/conversations`;
+export const superAdminConversationMessages = (conversationId: string) =>
+  `${superAdmin()}/conversations/${encodeURIComponent(conversationId)}/messages`;
 
 /* Conversation traces */
 export const conversationTrace = (conversationId: string) =>

@@ -28,6 +28,7 @@ const {
   resolvePullRequestCapabilities,
   resolvePreLoginAppConfig,
   withSafePolicyLinks,
+  isPptxPreviewEnabled,
 } = require('@librechat/api');
 const {
   DEFAULT_MCP_APP_CSP_LIMITS,
@@ -321,6 +322,7 @@ router.get('/', async function (req, res) {
       sharedLinksSnapshotFilesEnabled: sharedLinksEnabled && isFileSnapshotEnabled(appConfig),
       socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
       projects: appConfig?.projects,
+      filePreview: { pptxEnabled: isPptxPreviewEnabled() },
       interface: withSafePolicyLinks(appConfig?.interfaceConfig),
       titleGenerationTiming: resolveTitleTiming({
         appConfig,

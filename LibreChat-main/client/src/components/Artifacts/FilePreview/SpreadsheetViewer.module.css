@@ -1,0 +1,32 @@
+/* The grid's column count and widths come from the workbook, so they cannot be
+ * expressed as a fixed Tailwind class. Values arrive as custom properties and
+ * stay out of the component's style objects. */
+.spreadsheet-width {
+  width: var(--spreadsheet-width);
+}
+
+.spreadsheet-grid {
+  grid-template-columns: var(--spreadsheet-grid);
+  width: var(--spreadsheet-width);
+}
+
+.spreadsheet-canvas {
+  height: var(--spreadsheet-height);
+  width: var(--spreadsheet-width);
+}
+
+.spreadsheet-row {
+  grid-template-columns: var(--spreadsheet-grid);
+  height: var(--spreadsheet-row-height);
+  transform: translateY(var(--spreadsheet-row-offset));
+  width: var(--spreadsheet-width);
+}
+
+/* Excel fills and font colours are document data, not theme choices. */
+.spreadsheet-cell {
+  background-color: var(--cell-fill, transparent);
+  color: var(--cell-ink, inherit);
+  font-style: var(--cell-style, normal);
+  font-weight: var(--cell-weight, inherit);
+  text-align: var(--cell-align, inherit);
+}

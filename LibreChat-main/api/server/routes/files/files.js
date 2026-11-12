@@ -25,6 +25,8 @@ const {
   resolveDownloadPath,
   pipeToResponse,
   getSpreadsheetPreview,
+  getPptxPdfPreview,
+  PptxPreviewUnavailableError,
 } = require('@librechat/api');
 const {
   isUUID,
@@ -460,7 +462,7 @@ const SPREADSHEET_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
  * provider sources have no stream this route can safely consume, so they stay
  * download-only.
  */
-async function readSpreadsheetPreviewBuffer(req, file) {
+async function readFilePreviewBuffer(req, file) {
   const source = file.source ?? FileSources.local;
   if (
     source === FileSources.text ||
@@ -504,6 +506,53 @@ function wantsSpreadsheetPreview(req, file) {
  * `pending` past it is definitively orphaned. Tighter than the boot
  * sweep (5min) since this runs per-request, not per-instance. */
 const PREVIEW_LAZY_SWEEP_CUTOFF_MS = 2 * 60 * 1000;
+
+/**
+ * Render a PPTX as an inline PDF for the side-panel viewer. Disabled unless
+ * ENABLE_PPTX_PREVIEW is on and LibreOffice is installed in the image.
+ *
+ * @route GET /files/:file_id/preview/pdf
+ */
+router.get('/:file_id/preview/pdf', fileAccess, async (req, res) => {
+  try {
+    const { file_id } = req.params;
+    const file = req.fileAccess.file;
+    if (!file.filename?.toLowerCase().endsWith('.pptx')) {
+      return res.status(415).json({ code: 'UNSUPPORTED_PREVIEW' });
+    }
+    const buffer = await readFilePreviewBuffer(req, file);
+    if (buffer == null) {
+      return res.status(501).json({ code: 'PPTX_PREVIEW_UNAVAILABLE' });
+    }
+    const pdf = await getPptxPdfPreview({
+      fileId: file_id,
+      updatedAt: file.updatedAt,
+      buffer,
+    });
+    const pdfFilename = `${cleanFileName(file.filename).replace(/\.[^.]+$/, '')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename}"`);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(pdf);
+  } catch (error) {
+    if (
+      (typeof PptxPreviewUnavailableError === 'function' &&
+        error instanceof PptxPreviewUnavailableError) ||
+      error?.code === 'PPTX_PREVIEW_UNAVAILABLE'
+    ) {
+      return res.status(501).json({ code: 'PPTX_PREVIEW_UNAVAILABLE' });
+    }
+    if (error?.name === 'LibreOfficeUnavailableError') {
+      return res.status(503).json({ code: 'PPTX_PREVIEW_UNAVAILABLE' });
+    }
+    logger.error(
+      `[/files/:file_id/preview/pdf] PPTX preview failed for ${req.params.file_id}`,
+      getSafeErrorMetadata(error),
+    );
+    return res.status(500).json({ code: 'PPTX_PREVIEW_FAILED' });
+  }
+});
 
 /**
  * Poll the lifecycle status of a code-execution file's inline preview.
@@ -569,7 +618,7 @@ router.get('/:file_id/preview', fileAccess, async (req, res) => {
       }
       if (typeof getSpreadsheetPreview === 'function' && wantsSpreadsheetPreview(req, file)) {
         try {
-          const buffer = await readSpreadsheetPreviewBuffer(req, file);
+          const buffer = await readFilePreviewBuffer(req, file);
           if (buffer != null) {
             const preview = await getSpreadsheetPreview({
               fileId: file_id,

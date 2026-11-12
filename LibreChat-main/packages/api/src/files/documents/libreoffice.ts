@@ -230,12 +230,10 @@ export class LibreOfficeConversionError extends Error {
  *   - `LibreOfficeConversionError` for subprocess failures, timeout, or
  *     oversized output
  */
-export async function convertOfficeToPdf(buffer: Buffer, extensionHint: string): Promise<Buffer> {
-  if (IN_PROCESS_LIBREOFFICE_DISABLED) {
-    throw new LibreOfficeUnavailableError(
-      'In-process LibreOffice conversion is temporarily disabled',
-    );
-  }
+async function convertWithLibreOffice(
+  buffer: Buffer,
+  extensionHint: string,
+): Promise<Buffer> {
   const probe = await probeLibreOfficeBinary();
   if (!probe.available || !probe.binary) {
     throw new LibreOfficeUnavailableError(probe.reason ?? 'LibreOffice binary unavailable');
@@ -259,6 +257,32 @@ export async function convertOfficeToPdf(buffer: Buffer, extensionHint: string):
      * unmounts), the OS will reclaim the dir on next reboot. */
     await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+export async function convertOfficeToPdf(buffer: Buffer, extensionHint: string): Promise<Buffer> {
+  if (IN_PROCESS_LIBREOFFICE_DISABLED) {
+    throw new LibreOfficeUnavailableError(
+      'In-process LibreOffice conversion is temporarily disabled',
+    );
+  }
+  return convertWithLibreOffice(buffer, extensionHint);
+}
+
+/**
+ * PPTX preview is a separate, narrower opt-in than the general office HTML
+ * path. `ENABLE_PPTX_PREVIEW` turns only presentation-to-PDF conversion on;
+ * the legacy `OFFICE_PREVIEW_LIBREOFFICE` in-process path remains disabled.
+ */
+export function isPptxPreviewEnabled(): boolean {
+  const value = process.env.ENABLE_PPTX_PREVIEW;
+  return value != null && /^(1|true|yes)$/i.test(value.trim());
+}
+
+export async function convertPptxToPdf(buffer: Buffer): Promise<Buffer> {
+  if (!isPptxPreviewEnabled()) {
+    throw new LibreOfficeUnavailableError('PPTX preview is disabled');
+  }
+  return convertWithLibreOffice(buffer, 'pptx');
 }
 
 function runConversion(binary: string, inputPath: string, tempDir: string): Promise<void> {

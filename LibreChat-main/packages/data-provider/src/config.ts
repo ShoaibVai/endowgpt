@@ -3709,6 +3709,11 @@ export type TStartupConfig = {
    * is advertised. */
   codeWorkspaceInheritanceVersion?: typeof CODE_WORKSPACE_INHERITANCE_VERSION;
   interface?: TInterfaceConfig;
+  /** Native file-viewer capabilities resolved from server env. */
+  filePreview?: {
+    /** LibreOffice-backed PPTX -> PDF preview (ENABLE_PPTX_PREVIEW). */
+    pptxEnabled: boolean;
+  };
   /** endowGPT document editor limits, resolved from `documents` in librechat.yaml. */
   documents?: TDocumentsConfig;
   turnstile?: TTurnstileConfig;

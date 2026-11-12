@@ -1,5 +1,4 @@
 import React from 'react';
-import * as Tabs from '@radix-ui/react-tabs';
 import { render, screen } from '@testing-library/react';
 import type { Artifact } from '~/common';
 import GeneratedFileTabs from '../GeneratedFileTabs';
@@ -27,11 +26,7 @@ const artifact: Artifact = {
 
 describe('GeneratedFileTabs', () => {
   it('renders the file identity and download hint', () => {
-    render(
-      <Tabs.Root defaultValue="preview">
-        <GeneratedFileTabs artifact={artifact} />
-      </Tabs.Root>,
-    );
+    render(<GeneratedFileTabs artifact={artifact} />);
 
     expect(screen.getByText('Students.xlsx')).toBeInTheDocument();
     expect(screen.getByText('XLSX · Spreadsheet')).toBeInTheDocument();

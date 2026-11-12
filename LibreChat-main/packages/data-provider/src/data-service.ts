@@ -28,6 +28,7 @@ import * as q from './types/queries';
 import * as sk from './types/skills';
 import * as f from './types/files';
 import * as config from './config';
+import * as superadmin from './superadmin';
 import request from './request';
 import * as s from './schemas';
 import * as r from './roles';
@@ -44,6 +45,15 @@ export const {
   restoreDocumentVersion,
   aiEditDocument,
 } = documents;
+
+/** endowGPT superadmin portal reads (no mutations by design). */
+export const {
+  getSuperAdminAccess,
+  getSuperAdminOverview,
+  getSuperAdminUsers,
+  getSuperAdminConversations,
+  getSuperAdminMessages,
+} = superadmin;
 
 export function getInsights(params: TInsightsParams = {}): Promise<TInsightsResponse> {
   const query = new URLSearchParams();
@@ -666,8 +676,21 @@ export const getFiles = (params?: { limit?: number }): Promise<f.TFile[]> => {
  * Called from `useFilePreview`; React Query's `refetchInterval`
  * polls while `status === 'pending'` and stops on terminal status.
  */
-export const getFilePreview = (fileId: string): Promise<f.TFilePreview> => {
-  return request.get(endpoints.filePreview(fileId));
+export const getFilePreview = (
+  fileId: string,
+  params?: endpoints.FilePreviewParams,
+): Promise<f.TFilePreview> => {
+  return request.get(endpoints.filePreview(fileId, params));
+};
+
+/** Inline PDF bytes for the PPTX viewer; rejects with the route's 501 when disabled. */
+export const getFilePdfPreview = async (fileId: string): Promise<AxiosResponse> => {
+  return request.getResponse(endpoints.filePdfPreview(fileId), {
+    responseType: 'blob',
+    headers: {
+      Accept: 'application/pdf',
+    },
+  });
 };
 
 /** Preview status for a snapshotted file served through a shared link. */

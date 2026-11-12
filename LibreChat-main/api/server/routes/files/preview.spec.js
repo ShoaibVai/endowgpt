@@ -16,6 +16,13 @@ jest.mock('@librechat/data-schemas', () => ({
 }));
 
 const mockGetSpreadsheetPreview = jest.fn();
+const mockGetPptxPdfPreview = jest.fn();
+class MockPptxPreviewUnavailableError extends Error {
+  constructor() {
+    super('unavailable');
+    this.code = 'PPTX_PREVIEW_UNAVAILABLE';
+  }
+}
 
 jest.mock('@librechat/api', () => ({
   refreshS3FileUrls: jest.fn(),
@@ -24,6 +31,8 @@ jest.mock('@librechat/api', () => ({
   resolveDownloadPath: (file) => file.filepath,
   getSafeErrorMetadata: () => ({ name: 'Error' }),
   getSpreadsheetPreview: (...args) => mockGetSpreadsheetPreview(...args),
+  getPptxPdfPreview: (...args) => mockGetPptxPdfPreview(...args),
+  PptxPreviewUnavailableError: MockPptxPreviewUnavailableError,
   hasAgentBasedFileAccess: (...args) =>
     jest.requireActual('@librechat/api').hasAgentBasedFileAccess(...args),
 }));
@@ -106,6 +115,7 @@ describe('GET /files/:file_id/preview', () => {
     mockGetAgents.mockReset();
     mockGetAgents.mockResolvedValue([]);
     mockGetSpreadsheetPreview.mockReset();
+    mockGetPptxPdfPreview.mockReset();
     mockGetStrategyFunctions.mockReset();
     mockGetStrategyFunctions.mockReturnValue({});
   });
@@ -151,6 +161,54 @@ describe('GET /files/:file_id/preview', () => {
         offset: 0,
         limit: 100,
       }),
+    );
+  });
+
+  it('returns 501 when PPTX preview is disabled', async () => {
+    const file = {
+      file_id: 'deck-1',
+      user: OWNER_USER_ID,
+      filename: 'Deck.pptx',
+      filepath: '/uploads/user-123/deck-1__Deck.pptx',
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      source: 'local',
+      status: 'ready',
+      metadata: { generatedFile: { kind: 'presentation', format: 'pptx' } },
+    };
+    mockGetFiles.mockResolvedValueOnce([file]);
+    mockGetStrategyFunctions.mockReturnValue({
+      getDownloadStream: jest.fn(async () => Readable.from([Buffer.from('pptx')])),
+    });
+    mockGetPptxPdfPreview.mockRejectedValueOnce(new MockPptxPreviewUnavailableError());
+
+    const res = await request(buildApp()).get('/files/deck-1/preview/pdf').expect(501);
+
+    expect(res.body).toEqual({ code: 'PPTX_PREVIEW_UNAVAILABLE' });
+  });
+
+  it('streams the converted PDF for a PPTX attachment', async () => {
+    const file = {
+      file_id: 'deck-2',
+      user: OWNER_USER_ID,
+      filename: 'Deck.pptx',
+      filepath: '/uploads/user-123/deck-2__Deck.pptx',
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      source: 'local',
+      status: 'ready',
+      metadata: { generatedFile: { kind: 'presentation', format: 'pptx' } },
+    };
+    mockGetFiles.mockResolvedValueOnce([file]);
+    mockGetStrategyFunctions.mockReturnValue({
+      getDownloadStream: jest.fn(async () => Readable.from([Buffer.from('pptx')])),
+    });
+    mockGetPptxPdfPreview.mockResolvedValueOnce(Buffer.from('%PDF-1.7'));
+
+    const res = await request(buildApp()).get('/files/deck-2/preview/pdf').expect(200);
+
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(res.headers['content-disposition']).toContain('Deck.pdf');
+    expect(mockGetPptxPdfPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ fileId: 'deck-2' }),
     );
   });
 

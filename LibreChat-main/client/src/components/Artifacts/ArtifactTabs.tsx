@@ -15,7 +15,7 @@ import { useLocalize } from '~/hooks';
 
 const SandboxArtifactTabs = lazyWithRecovery(() => import('./SandboxArtifactTabs'));
 const DocumentTabs = lazyWithRecovery(() => import('./Document'));
-const GeneratedFileTabs = lazyWithRecovery(() => import('./GeneratedFileTabs'));
+const FilePreview = lazyWithRecovery(() => import('./FilePreview'));
 
 interface ArtifactTabsProps {
   artifact: Artifact;
@@ -112,7 +112,7 @@ export default function ArtifactTabs(props: ArtifactTabsProps) {
   if (props.artifact.download?.generatedFile != null) {
     return (
       <Suspense fallback={<LoadingArtifactTabs />}>
-        <GeneratedFileTabs artifact={props.artifact} />
+        <FilePreview artifact={props.artifact} />
       </Suspense>
     );
   }

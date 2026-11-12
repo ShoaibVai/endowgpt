@@ -4,6 +4,7 @@ export * from './limits';
 export * from './persist';
 export * from './presentation';
 export * from './preview';
+export * from './pptx';
 export * from './schema';
 export * from './spreadsheet';
 export * from './types';

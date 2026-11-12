@@ -296,6 +296,23 @@ export default defineConfig(({ command }) => ({
                   if (normalizedId.includes('@codesandbox/sandpack')) {
                     return 'sandpack';
                   }
+                  /* DOCX rendering and its zip reader are only reachable from the
+                   * lazy docx viewer. */
+                  if (
+                    normalizedId.includes('/node_modules/docx-preview/') ||
+                    normalizedId.includes('/node_modules/jszip/')
+                  ) {
+                    return 'docx-preview';
+                  }
+                  /* React-PDF and its pdfjs runtime are only reachable from the
+                   * lazy file-preview chunk; keeping them out of vendor means a
+                   * PDF viewer download happens on first open, not first paint. */
+                  if (
+                    normalizedId.includes('/node_modules/react-pdf/') ||
+                    normalizedId.includes('/node_modules/pdfjs-dist/')
+                  ) {
+                    return 'pdf';
+                  }
                   if (normalizedId.includes('react-vtree')) {
                     return 'react-vtree';
                   }

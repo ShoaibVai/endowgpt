@@ -1,4 +1,3 @@
-import * as Tabs from '@radix-ui/react-tabs';
 import { FileSpreadsheet, FileText, Presentation } from 'lucide-react';
 import type { Artifact } from '~/common';
 import { useLocalize } from '~/hooks';
@@ -29,10 +28,7 @@ const VISUALS = {
   },
 } as const;
 
-/**
- * Interim file preview shell. The Phase 3 viewers replace the hint with the
- * spreadsheet grid, docx pages, or PDF viewer while keeping this panel chrome.
- */
+/** Fallback for generated file formats without a native viewer. */
 export default function GeneratedFileTabs({ artifact }: { artifact: Artifact }) {
   const localize = useLocalize();
   const metadata = artifact.download?.generatedFile;
@@ -44,11 +40,7 @@ export default function GeneratedFileTabs({ artifact }: { artifact: Artifact }) 
     : filename.split('.').pop()?.toUpperCase();
 
   return (
-    <Tabs.Content
-      value="preview"
-      className="flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center"
-      tabIndex={-1}
-    >
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center">
       <span
         className={cn('flex size-14 items-center justify-center rounded-2xl', tile)}
         aria-hidden="true"
@@ -64,6 +56,6 @@ export default function GeneratedFileTabs({ artifact }: { artifact: Artifact }) 
       <p className="text-text-tertiary max-w-sm text-sm">
         {localize('com_ui_generated_file_download_hint')}
       </p>
-    </Tabs.Content>
+    </div>
   );
 }

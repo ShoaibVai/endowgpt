@@ -225,6 +225,19 @@ export default function Artifacts() {
     setArtifactsVisible,
   ]);
 
+  useEffect(() => {
+    if (!isVisible || isUndocked || !isGeneratedFileArtifact) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeArtifacts();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [closeArtifacts, isGeneratedFileArtifact, isUndocked, isVisible]);
+
   const toggleUndock = useCallback(() => {
     if (isUndocked) {
       /* This button goes away with its window; the docked pane picks focus up. */
