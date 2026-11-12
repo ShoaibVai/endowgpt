@@ -17,11 +17,11 @@ and its RAG API.
   — boot/config/branding/documents/models smoke test.
 
 ### Models
-- Single OpenAI-compatible endpoint at `https://opencode.ai/zen/v1`, credential
-  from env only. Model specs: **endowGPT Fast (DeepSeek)**
-  (`deepseek-v4.1-flash-free`, default) and **endowGPT Flash (GLM)**
-  (`glm-5.3-flash-free`), both with `artifacts` + `fileSearch` enabled; title
-  generation pinned to the GLM model; streaming on; friendly error copy.
+- Single OpenAI-compatible endpoint at `https://opencode.ai/inference/go/openai/v1`,
+  credential from env only. One model spec: **endowGPT Fast**
+  (`deepseek-v4.1-flash`, default) with `artifacts` + `fileSearch` enabled;
+  title generation and document edits pinned to the same model; streaming on;
+  friendly error copy.
 
 ### Branding (M2)
 - Palette applied through the inline deployment theme in `librechat.yaml`

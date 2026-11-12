@@ -2,6 +2,8 @@ export * from './Auth';
 export * from './Agents';
 /* endowGPT document artifacts */
 export * from './Documents';
+/* endowGPT superadmin portal */
+export * from './SuperAdmin';
 export * from './Endpoints';
 export * from './Skills';
 export * from './Files';

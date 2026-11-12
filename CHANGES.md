@@ -55,6 +55,15 @@ theme tokens, copy via `useLocalize()`).
 | `packages/data-schemas/src/schema/index.ts` | M4 | export the new schema |
 | `packages/data-schemas/src/models/index.ts` | M4 | register the model in `createModels` |
 | `packages/data-schemas/src/methods/index.ts` | M4 | fold document methods into `createMethods` |
+| `api/server/index.js` | M8 | mount `/api/superadmin` |
+| `api/server/routes/index.js` | M8 | register the superadmin router |
+| `packages/data-provider/src/api-endpoints.ts` | M8 | `/api/superadmin` endpoint builders |
+| `packages/data-provider/src/data-service.ts` | M8 | re-export the superadmin read service |
+| `packages/data-provider/src/keys.ts` | M8 | superadmin query keys |
+| `packages/data-provider/src/index.ts` | M8 | export the superadmin module |
+| `packages/data-schemas/src/methods/index.ts` | M8 | fold superadmin aggregation methods into `createMethods` |
+| `packages/data-schemas/src/types/index.ts` | M8 | export superadmin method types |
+| `packages/api/src/index.ts` | M8 | export the superadmin TS module |
 
 ## New feature modules (endowGPT files inside LibreChat-main)
 
@@ -87,6 +96,25 @@ theme tokens, copy via `useLocalize()`).
 | `client/src/components/Brand/LogoSplash.tsx` | M2 | once-per-session reveal video with static fallback; skip + reduced-motion |
 | `client/src/components/Brand/Credits.tsx` | M2 | `/credits` attribution page |
 | `client/src/components/Brand/endow.css` | M2 | splash keyframes only (no brand colors) |
+| `api/server/routes/superadmin.js` | M8 | thin CJS mount: JWT + `access:admin`, then the TS router |
+| `packages/data-provider/src/superadmin.ts` | M8 | shared superadmin wire types, query schemas, and read service |
+| `packages/data-schemas/src/types/superadmin.ts` | M8 | superadmin method input/result types |
+| `packages/data-schemas/src/methods/superadmin.ts` | M8 | overview, per-user usage, conversation list, and transcript aggregations |
+| `packages/data-schemas/src/methods/superadmin.spec.ts` | M8 | aggregation tests (transactions, message fallback, search, ownership) |
+| `packages/api/src/superadmin/routes.ts` | M8 | validated read-only router + stable error codes |
+| `packages/api/src/superadmin/routes.spec.ts` | M8 | HTTP contract tests for the portal |
+| `packages/api/src/superadmin/index.ts` | M8 | module export |
+| `client/src/data-provider/SuperAdmin/queries.ts` | M8 | React Query hooks for access, overview, users, chats, messages |
+| `client/src/data-provider/SuperAdmin/index.ts` | M8 | data-provider barrel |
+| `client/src/components/SuperAdmin/SuperAdminView.tsx` | M8 | `/superadmin` page: range KPIs, daily/model usage, user table |
+| `client/src/components/SuperAdmin/panels.tsx` | M8 | panels, KPI cards, usage tables, user table, pagination |
+| `client/src/components/SuperAdmin/ChatHistory.tsx` | M8 | read-only conversation picker and message transcript dialog |
+| `client/src/components/SuperAdmin/format.ts` | M8 | locale-aware number/date formatting |
+| `client/src/components/SuperAdmin/index.ts` | M8 | lazy route entry |
+| `client/src/components/SuperAdmin/__tests__/SuperAdminView.spec.tsx` | M8 | access, totals, and transcript component tests |
+| `client/src/routes/index.tsx` | M8 | `/superadmin` route |
+| `client/src/hooks/Nav/useUnifiedSidebarLinks.ts` | M8 | sidebar entry gated by `access:admin` |
+| `client/src/locales/en/translation.json` | M8 | superadmin copy keys |
 
 ## Brand-asset findings (recorded for future maintainers)
 
@@ -153,3 +181,15 @@ LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
   that rode along with suggestion spans (now only the suggestion marks are
   stripped). Final report in `REPORT.md`; branding sweep and README ops guide
   finished.
+- **M8** - superadmin portal: a read-only `/superadmin` surface for users with
+  the `access:admin` capability. Adds `/api/superadmin` (overview, users,
+  conversations, transcript, access) with shared wire types in
+  `packages/data-provider`, aggregation methods in `packages/data-schemas`, and
+  a validation-only router in `packages/api`. Token totals come from the
+  per-request `transactions` records and fall back to saved message
+  `tokenCount` when a range has no request-level usage. Chat history excludes
+  temporary chats and subagent threads and never reads `privateText`. The
+  client page reuses semantic theme roles and `@librechat/client` primitives,
+  with a sidebar entry shown only after the access probe succeeds. Tests cover
+  transaction vs. fallback aggregation, search, pagination, ownership checks,
+  the HTTP contract, and the page's access/totals/transcript states.

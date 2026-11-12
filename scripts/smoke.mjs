@@ -41,8 +41,11 @@ function readEnvKey() {
 }
 
 const OPENCODE_BASE = (
-  process.env.OPENCODE_BASE_URL ?? 'https://opencode.ai/zen/v1'
+  process.env.OPENCODE_BASE_URL ?? 'https://opencode.ai/inference/go/openai/v1'
 ).replace(/\/$/, '');
+
+/** OpenCode Go requires a stable session id and a real client user agent. */
+const SMOKE_UA = 'endowGPT-smoke/1.0';
 
 const results = [];
 const step = (name, status, detail = '') => {
@@ -77,26 +80,20 @@ async function main() {
 
   const specs = config?.modelSpecs?.list ?? [];
   if (specs.length > 0) {
-    const deepseek = specs.find((spec) => spec.name === 'deepseek-v4.1-flash-free');
-    const glm = specs.find((spec) => spec.name === 'glm-5.3-flash-free');
+    const deepseek = specs.find((spec) => spec.name === 'deepseek-v4.1-flash');
     step(
       'model specs',
-      deepseek != null && glm != null ? 'pass' : 'fail',
-      `deepseek=${deepseek != null}, glm=${glm != null}`,
+      deepseek != null && specs.length === 1 ? 'pass' : 'fail',
+      `deepseek=${deepseek != null}, specs=${specs.length}`,
     );
     step(
       'spec capabilities',
-      deepseek?.artifacts === true &&
-        glm?.artifacts === true &&
-        deepseek?.fileSearch === true &&
-        glm?.fileSearch === true
-        ? 'pass'
-        : 'fail',
-      'artifacts + fileSearch on both specs',
+      deepseek?.artifacts === true && deepseek?.fileSearch === true ? 'pass' : 'fail',
+      'artifacts + fileSearch on the model spec',
     );
     step(
       'default model',
-      specs.find((spec) => spec.default === true)?.name === 'deepseek-v4.1-flash-free'
+      specs.find((spec) => spec.default === true)?.name === 'deepseek-v4.1-flash'
         ? 'pass'
         : 'fail',
     );
@@ -149,13 +146,11 @@ async function main() {
   if (!apiKey) {
     step('model smoke', 'skip', 'OPENCODE_API_KEY not set; boot checks above still ran');
   } else {
-    for (const model of ['deepseek-v4.1-flash-free', 'glm-5.3-flash-free']) {
+    for (const model of ['deepseek-v4.1-flash']) {
       const started = Date.now();
       let lastStatus = 0;
       let text = '';
-      let freeLimitHit = false;
-      // Free-tier endpoints rate-limit aggressively; one retry after a short
-      // backoff keeps the smoke meaningful without hammering.
+      // One retry covers transient rate limits without hammering the gateway.
       for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt > 0) {
           await new Promise((resolve) => setTimeout(resolve, 15_000));
@@ -163,7 +158,12 @@ async function main() {
         try {
           const res = await fetch(`${OPENCODE_BASE}/chat/completions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+              'User-Agent': SMOKE_UA,
+              'x-opencode-session': 'endowgpt-smoke',
+            },
             body: JSON.stringify({
               model,
               stream: false,
@@ -176,10 +176,6 @@ async function main() {
           });
           lastStatus = res.status;
           if (res.status === 429) {
-            const body = (await res.text()).slice(0, 200);
-            if (/FreeUsageLimitError|usage limit/i.test(body)) {
-              freeLimitHit = true;
-            }
             continue;
           }
           if (!res.ok) {
@@ -194,13 +190,7 @@ async function main() {
           break;
         }
       }
-      if (lastStatus === 429 && freeLimitHit) {
-        step(
-          `model ${model}`,
-          'skip',
-          'key authenticated but the upstream free-tier usage limit is reached; retry after the quota resets',
-        );
-      } else if (lastStatus === 429) {
+      if (lastStatus === 429) {
         step(`model ${model}`, 'fail', 'rate-limited upstream (HTTP 429) even after retry');
       } else if (lastStatus === 0) {
         /* step already emitted the failure */

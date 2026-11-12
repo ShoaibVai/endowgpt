@@ -10,6 +10,8 @@ export * from './credentials';
 export * from './artifacts';
 /* endowGPT document artifacts */
 export * from './documents';
+/* endowGPT superadmin portal */
+export * from './superadmin';
 /* Admin */
 export * from './admin';
 export * from './cdn';

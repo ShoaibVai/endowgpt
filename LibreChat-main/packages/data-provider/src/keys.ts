@@ -38,6 +38,12 @@ export enum QueryKeys {
   documentVersionContent = 'documentVersionContent',
   insights = 'insights',
   insightsAccess = 'insightsAccess',
+  /* endowGPT superadmin portal */
+  superAdminAccess = 'superAdminAccess',
+  superAdminOverview = 'superAdminOverview',
+  superAdminUsers = 'superAdminUsers',
+  superAdminConversations = 'superAdminConversations',
+  superAdminMessages = 'superAdminMessages',
   assistants = 'assistants',
   assistant = 'assistant',
   agents = 'agents',

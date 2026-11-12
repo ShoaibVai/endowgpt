@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 rem endowGPT: stop the stack. Data (Mongo, Meili, pgvector, Ollama, uploads)
 rem is kept in named volumes.
 rem Optional: stop.bat --wipe   (also delete all data volumes - destructive)
@@ -20,9 +20,9 @@ if /i "%~1"=="--wipe" (
         exit /b 1
     )
     docker compose down -v
-    exit /b %errorlevel%
+    exit /b !errorlevel!
 )
 
 echo [endowGPT] Stopping the stack (volumes are kept; use stop.bat --wipe to delete data^)...
 docker compose down
-exit /b %errorlevel%
+exit /b !errorlevel!

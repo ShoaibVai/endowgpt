@@ -38,7 +38,7 @@ open http://localhost:3080    # register the first user (it becomes admin)
 
 | Variable | Notes |
 |---|---|
-| `OPENCODE_API_KEY` | credential for `https://opencode.ai/zen/v1`; stays out of git |
+| `OPENCODE_API_KEY` | credential for the OpenCode Go plan (`https://opencode.ai/inference/go/openai/v1`); stays out of git |
 | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET` | generate (48–64 random chars) |
 | `CREDS_KEY`, `CREDS_IV` | exactly 64 / 32 hex chars |
 | `MEILI_MASTER_KEY`, `POSTGRES_PASSWORD` | generate |
@@ -71,14 +71,16 @@ Only `api:3080` is exposed on the host.
 
 ### Models
 
-A single OpenAI-compatible endpoint points at `https://opencode.ai/zen/v1`
-(credential from `OPENCODE_API_KEY` only). Model specs in
-`LibreChat-main/librechat.yaml` give each model its display name:
+A single OpenAI-compatible endpoint points at the OpenCode Go plan API
+(`https://opencode.ai/inference/go/openai/v1`, credential from
+`OPENCODE_API_KEY` only — this is **not** the pay-as-you-go `/zen/v1` surface).
+Requests carry a stable `x-opencode-session` header (per user) and a client
+User-Agent, which Go requires for routing and prompt caching. One model spec in
+`LibreChat-main/librechat.yaml` gives the model its display name:
 
 | Label | Model | Notes |
 |---|---|---|
-| endowGPT Fast (DeepSeek) | `deepseek-v4.1-flash-free` | default for new chats; artifacts + file search |
-| endowGPT Flash (GLM) | `glm-5.3-flash-free` | used for titles and cheap utility calls; artifacts + file search |
+| endowGPT Fast | `deepseek-v4.1-flash` | default for new chats, titles, and document edits; artifacts + file search |
 
 Streaming is always on; reasoning appears in a collapsible "Thinking" block;
 upstream auth/rate/availability errors are mapped to readable messages.
@@ -136,6 +138,33 @@ Upload PDF, DOCX, TXT, or MD and ask about them; answers cite the retrieved
 chunks (file, snippet, score). A "Edit this document" action on a retrieved file
 imports the text into the document editor. Embeddings run locally via Ollama.
 RAG failures surface as a calm, localized notice inside chat.
+
+### Superadmin portal
+
+Users holding the deployment's `access:admin` capability (the first registered
+user is an admin by default) get a **Superadmin** entry in the sidebar and a
+read-only portal at `/superadmin`:
+
+- **Usage overview** for 24h / 7d / 30d / all time: total users and active
+  users, conversations, messages, input/output/total tokens, daily usage, and
+  usage by model.
+- **Users table** with per-user conversation/message counts, input/output/total
+  tokens, last activity, and search/pagination.
+- **Chat history** for any user: browse their conversations, then read the
+  message transcript (sender, time, model, tokens, text) without leaving the
+  portal. Temporary chats and subagent threads are excluded, and private
+  message fields are never read.
+
+Token totals are summed from the per-request `transactions` records LibreChat
+writes for each model call. If a deployment or date range has no request-level
+usage, the portal falls back to the `tokenCount` stored on saved messages and
+labels the numbers as estimates. The portal is strictly read-only: it cannot
+delete users or conversations, impersonate a user, or start a chat.
+
+Access is enforced on the server by the existing capability middleware
+(`/api/superadmin` requires `access:admin`) and mirrored in the client by an
+access probe, so granting or revoking the capability changes both the API and
+the navigation entry.
 
 ---
 

@@ -140,11 +140,11 @@ endpoints:
       apiKey: "${OPENCODE_API_KEY}"
       baseURL: "https://opencode.ai/zen/v1"
       models:
-        default: ["deepseek-v4.1-flash-free", "glm-5.3-flash-free"]
+        default: ["deepseek-v4.1-flash"]
         fetch: false
       titleConvo: true
       titleMethod: "completion"
-      titleModel: "glm-5.3-flash-free"
+      titleModel: "deepseek-v4.1-flash"
       modelDisplayLabel: "endowGPT"
 ```
 
@@ -152,13 +152,12 @@ Per-model specs provide the labels the endpoint cannot:
 
 | Spec `name` | `label` (UI) | Capabilities |
 |---|---|---|
-| `deepseek-v4.1-flash-free` | endowGPT Fast (DeepSeek) | `default: true`, `artifacts: true`, `fileSearch: true`, `showOnLanding: true`, reasoning |
-| `glm-5.3-flash-free` | endowGPT Flash (GLM) | `artifacts: true`, `fileSearch: true`, `showOnLanding: true` |
+| `deepseek-v4.1-flash` | endowGPT Fast | `default: true`, `artifacts: true`, `fileSearch: true`, `showOnLanding: true`, reasoning |
 
 - API key comes only from `OPENCODE_API_KEY`; it is never written into YAML or code.
-- `titleModel` is the cheap model, so titling never competes with the main answer.
+- `titleModel` uses the same model, so titles never need a second upstream model.
 - `fileSearch: true` makes LibreChat create an ephemeral agent per conversation for custom
-  endpoints, which is what enables RAG tools *and* artifact prompting for both models.
+  endpoints, which is what enables RAG tools *and* artifact prompting.
 - Streaming stays on (`streaming: true` in `librechat.yaml`).
 - Reasoning text is rendered in a collapsible "Thinking" block (existing LibreChat
   reasoning UI, restyled and labelled).
@@ -168,11 +167,11 @@ Per-model specs provide the labels the endpoint cannot:
   "The model provider is having trouble…". No raw stack traces or keys in the UI.
 - Default new-chat model: DeepSeek (spec `default: true`).
 
-**Decision (documents, both models):** document creation and update use LibreChat's
+**Decision (documents):** document creation and update use LibreChat's
 existing *artifact-in-markdown* contract, not tool calls. The model is instructed to emit a
 ```document ... ``` block with `type: "document"`; updates re-emit the same artifact with an
 `identifier` and the full new Markdown. This is the most reliable path for
-DeepSeek/GLM because it needs no tool-calling support, and LibreChat already reconciles
+DeepSeek because it needs no tool-calling support, and LibreChat already reconciles
 artifacts by identifier. Two safety nets make it robust:
 
 1. The client editor owns the canonical content once opened, autosaves to
@@ -180,7 +179,7 @@ artifacts by identifier. Two safety nets make it robust:
 2. Targeted selection edits never depend on the model obeying an artifact contract — they
    call `POST /api/documents/ai-edit` with the exact selected text and get plain text back.
 
-Both models are tested with the same prompts; see §10.
+The model is tested with the same prompts; see §10.
 
 ---
 
@@ -373,7 +372,7 @@ documents:
   aiEditMaxPerHour: 30         # inline edits allowed per user per hour
   versionHistoryCap: 50        # version snapshots per document
   autosaveDelayMs: 800         # client autosave debounce
-  allowedAiEditModels: [deepseek-v4.1-flash-free, glm-5.3-flash-free]
+  allowedAiEditModels: [deepseek-v4.1-flash]
 ```
 
 `PUT` conflicts: if `baseVersionId` is supplied and is not the newest version, return
@@ -490,7 +489,7 @@ Each milestone ends with a working `docker compose up -d`, no uncommitted debris
 | Risk | Mitigation |
 |---|---|
 | Upstream model rejects artifact emulation or truncates long documents | Keep editor authoritative; targeted edits via `/ai-edit`; cap document prompt size and rely on editor for long content |
-| GLM/DeepSeek tool-calling differences | No document tool calls; artifact-in-markdown + REST fallback |
+| DeepSeek tool-calling behavior | No document tool calls; artifact-in-markdown + REST fallback |
 | `npm ci` inside Docker needs lockfile updated | Add client deps with `npm install` at repo root, commit `package-lock.json` |
 | Large SVG logos inflate bundle | Ship cropped SVGs for UI, rasterized PNGs for icons, keep originals at root only |
 | RAG first boot races embeddings | `ollama-init` completion gates `rag_api`; health checks on all |
@@ -504,7 +503,7 @@ Each milestone ends with a working `docker compose up -d`, no uncommitted debris
 
 1. `docker compose up -d` from a clean clone (with `.env` filled) serves the app on
    `http://localhost:3080`.
-2. Both labels appear, both stream answers, title generation uses the GLM model, thinking
+2. The model label appears, it streams answers, title generation uses the same model, thinking
    is collapsible, and upstream errors read as plain English.
 3. No LibreChat branding is visible anywhere a user looks, including the tab, PWA install,
    login, sidebar, welcome, footer, and About/credits page.

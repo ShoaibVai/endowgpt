@@ -50,7 +50,9 @@ if %TRIES% GEQ 80 (
     echo [endowGPT] Check: docker compose ps  /  docker compose logs -f api
     exit /b 1
 )
-timeout /t 3 /nobreak >nul
+rem ping is used instead of `timeout` because timeout fails when input is
+rem redirected ("Input redirection is not supported") and then never sleeps.
+ping -n 4 127.0.0.1 >nul
 goto wait
 
 :ready

@@ -25,6 +25,8 @@ export * from './toolTiming';
 export * from './artifacts';
 /* endowGPT document artifacts */
 export * from './documents';
+/* endowGPT superadmin portal */
+export * from './superadmin';
 /* schema helpers  */
 export * from './parsers';
 /* custom/dynamic configurations  */

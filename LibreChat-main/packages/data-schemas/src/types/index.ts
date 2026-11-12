@@ -55,3 +55,5 @@ export * from './web';
 /* MCP Servers */
 export * from './mcp';
 export * from './mcpAuthority';
+/* endowGPT superadmin portal */
+export * from './superadmin';

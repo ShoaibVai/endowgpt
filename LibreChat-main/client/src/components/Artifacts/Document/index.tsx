@@ -102,7 +102,7 @@ export default function DocumentArtifactTabs({
   const aiEditModel = useMemo(() => {
     const specs = startupConfig?.modelSpecs?.list ?? [];
     const preferred = specs.find((spec) => spec.default === true) ?? specs[0];
-    return preferred?.preset?.model ?? 'deepseek-v4.1-flash-free';
+    return preferred?.preset?.model ?? 'deepseek-v4.1-flash';
   }, [startupConfig?.modelSpecs?.list]);
   const [showVersions, setShowVersions] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState<SuggestionRange | null>(null);

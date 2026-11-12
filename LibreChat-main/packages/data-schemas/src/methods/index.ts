@@ -229,6 +229,8 @@ import {
 } from './mcpAuthority';
 /* Insights */
 import { createInsightsMethods, type InsightsMethods } from './insights';
+/* endowGPT superadmin portal */
+import { createSuperAdminMethods, type SuperAdminMethods } from './superadmin';
 
 export {
   runAfterTransaction,
@@ -330,7 +332,8 @@ export type AllMethods = SubagentContentMethods &
   ConfigMethods &
   PrincipalMethods &
   MCPAuthorityMethods &
-  InsightsMethods;
+  InsightsMethods &
+  SuperAdminMethods;
 
 /** Dependencies injected from the api layer into createMethods */
 export interface CreateMethodsDeps {
@@ -586,6 +589,8 @@ export function createMethods(
     ...createMCPAuthorityMethods(mongoose),
     /* Insights */
     ...createInsightsMethods(mongoose),
+    /* endowGPT superadmin portal */
+    ...createSuperAdminMethods(mongoose),
   };
 }
 
@@ -687,6 +692,7 @@ export type {
   MCPAuthorityConfigSourceDocument,
   MCPAuthorityCredentialSourceDocument,
   InsightsMethods,
+  SuperAdminMethods,
 };
 
 export { recordAgentEventActorReceiptMetric, setAgentEventActorReceiptMetricObserver };

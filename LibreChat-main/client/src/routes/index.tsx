@@ -46,6 +46,11 @@ const loadInsightsView = () =>
     Component: m.default,
   }));
 
+const loadSuperAdminView = () =>
+  importWithRecovery(() => import('~/components/SuperAdmin')).then((m) => ({
+    Component: m.default,
+  }));
+
 const loadProjectsView = () =>
   importWithRecovery(() => import('~/components/Projects')).then((m) => ({
     Component: m.ProjectsView,
@@ -190,6 +195,10 @@ export const router = createBrowserRouter(
                 {
                   path: 'insights',
                   lazy: loadInsightsView,
+                },
+                {
+                  path: 'superadmin',
+                  lazy: loadSuperAdminView,
                 },
                 {
                   path: 'skills/new',

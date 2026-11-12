@@ -31,20 +31,27 @@ endpoints:
   custom:
     - name: "endowGPT"
       apiKey: "${OPENCODE_API_KEY}"
-      baseURL: "https://opencode.ai/zen/v1"
+      # OpenCode Go plan endpoint (NOT /zen/v1, which is the pay-as-you-go
+      # credit API). Go quota is served on the /inference/go surface.
+      baseURL: "https://opencode.ai/inference/go/openai/v1"
+      # Go requires a stable session id + a client user agent for routing and
+      # prompt caching. Session is scoped per user; LibreChat cannot vary
+      # headers per conversation.
+      headers:
+        x-opencode-session: "{{LIBRECHAT_USER_ID}}"
+        User-Agent: "endowGPT/1.0"
       models:
         default:
-          - "deepseek-v4.1-flash-free"
-          - "glm-5.3-flash-free"
+          - "deepseek-v4.1-flash"
         # The catalog is a fixed, self-hosted allow-list; do not fetch upstream.
         fetch: false
       # Cheap headline model keeps chat responses focused on the real request.
       titleConvo: true
       titleMethod: "completion"
-      titleModel: "glm-5.3-flash-free"
+      titleModel: "deepseek-v4.1-flash"
       titleMessageRole: "user"
       modelDisplayLabel: "endowGPT"
-      iconURL: "/assets/endowgpt-mark.svg"
+      iconURL: "/assets/endowgpt-mark.png"
 
 # -----------------------------------------------------------------------------
 # Model specs: the user-facing labels + per-model capabilities.
@@ -54,29 +61,14 @@ endpoints:
 modelSpecs:
   enforce: true
   list:
-    - name: "deepseek-v4.1-flash-free"
-      label: "endowGPT Fast (DeepSeek)"
-      description: "Fastest everyday chat, editing, and document drafting."
+    - name: "deepseek-v4.1-flash"
+      label: "endowGPT Fast"
+      description: "Fast everyday chat, editing, and document drafting."
       preset:
         endpoint: "endowGPT"
-        model: "deepseek-v4.1-flash-free"
+        model: "deepseek-v4.1-flash"
       default: true
       order: 1
-      showOnLanding: true
-      conversation_starters:
-        - "Draft a document"
-        - "Build an interactive page"
-        - "Summarize a file"
-      artifacts: true
-      fileSearch: true
-
-    - name: "glm-5.3-flash-free"
-      label: "endowGPT Flash (GLM)"
-      description: "Quick short-form answers, summaries, and routing."
-      preset:
-        endpoint: "endowGPT"
-        model: "glm-5.3-flash-free"
-      order: 2
       showOnLanding: true
       conversation_starters:
         - "Draft a document"
@@ -202,7 +194,6 @@ documents:
   aiEditMaxChars: 20000
   aiEditMaxPerHour: 30
   allowedAiEditModels:
-    - "deepseek-v4.1-flash-free"
-    - "glm-5.3-flash-free"
+    - "deepseek-v4.1-flash"
   versionHistoryCap: 50
   autosaveDelayMs: 800

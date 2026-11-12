@@ -1,12 +1,17 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { BarChart3, MessagesSquare } from 'lucide-react';
+import { BarChart3, MessagesSquare, ShieldCheck } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
 import type { TEndpointsConfig } from 'librechat-data-provider';
 import type { NavLink } from '~/common';
-import { useGetEndpointsQuery, useGetStartupConfig, useInsightsAccessQuery } from '~/data-provider';
+import {
+  useGetEndpointsQuery,
+  useGetStartupConfig,
+  useInsightsAccessQuery,
+  useSuperAdminAccessQuery,
+} from '~/data-provider';
 import ConversationsSection from '~/components/UnifiedSidebar/ConversationsSection';
 import useSideNavLinks from '~/hooks/Nav/useSideNavLinks';
 import { useAuthContext } from '~/hooks';
@@ -36,6 +41,8 @@ export default function useUnifiedSidebarLinks() {
       enabled: !!user && insightsFeatureEnabled && !isInsightsRoute,
     },
   );
+  const { data: superAdminAccess } = useSuperAdminAccessQuery(user?.id, { enabled: !!user });
+  const superAdminEnabled = superAdminAccess?.access === true;
 
   const endpointType = useMemo(
     () => getEndpointField(endpointsConfig, endpoint, 'type'),
@@ -71,31 +78,43 @@ export default function useUnifiedSidebarLinks() {
       id: 'conversations',
       Component: ConversationsSection,
     };
+    const nextLinks: NavLink[] = [conversationLink, ...sideNavLinks];
 
-    if (
-      !insightsFeatureEnabled ||
-      (!isInsightsRoute && !isInsightsAccessLoading && insightsAccess?.access !== true)
-    ) {
-      return [conversationLink, ...sideNavLinks];
+    if (superAdminEnabled) {
+      nextLinks.splice(1, 0, {
+        title: 'com_superadmin_navigation',
+        label: '',
+        icon: ShieldCheck,
+        id: 'superadmin',
+        onClick: () => {
+          if (!location.pathname.startsWith('/superadmin')) {
+            navigate('/superadmin');
+          }
+        },
+      });
     }
 
-    const insightsLink: NavLink = {
-      title: 'com_insights_navigation',
-      label: '',
-      icon: BarChart3,
-      id: 'insights',
-      disabled: !isInsightsRoute && isInsightsAccessLoading,
-      onClick: () => {
-        if (!location.pathname.startsWith('/insights')) {
-          navigate('/insights');
-        }
-      },
-    };
-    const mcpIndex = sideNavLinks.findIndex((link) => link.id === 'mcp-builder');
-    const nextLinks = [...sideNavLinks];
-    nextLinks.splice(mcpIndex >= 0 ? mcpIndex + 1 : nextLinks.length, 0, insightsLink);
+    const insightsAvailable =
+      insightsFeatureEnabled &&
+      (isInsightsRoute || (!isInsightsAccessLoading && insightsAccess?.access === true));
+    if (insightsAvailable) {
+      const insightsLink: NavLink = {
+        title: 'com_insights_navigation',
+        label: '',
+        icon: BarChart3,
+        id: 'insights',
+        disabled: !isInsightsRoute && isInsightsAccessLoading,
+        onClick: () => {
+          if (!location.pathname.startsWith('/insights')) {
+            navigate('/insights');
+          }
+        },
+      };
+      const mcpIndex = nextLinks.findIndex((link) => link.id === 'mcp-builder');
+      nextLinks.splice(mcpIndex >= 0 ? mcpIndex + 1 : nextLinks.length, 0, insightsLink);
+    }
 
-    return [conversationLink, ...nextLinks];
+    return nextLinks;
   }, [
     insightsAccess?.access,
     insightsFeatureEnabled,
@@ -104,6 +123,7 @@ export default function useUnifiedSidebarLinks() {
     location.pathname,
     navigate,
     sideNavLinks,
+    superAdminEnabled,
   ]);
 
   return links;

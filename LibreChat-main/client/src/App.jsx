@@ -55,8 +55,8 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <LogoSplash />
       <RecoilRoot>
+        <LogoSplash />
         <LanguageSync />
         <UiScaleSync />
         <Direction>
@@ -101,7 +101,6 @@ const App = () => {
     </QueryClientProvider>
   );
 };
-
 export default () => (
   <ScreenshotProvider>
     <App />

@@ -4469,10 +4469,7 @@ export const documentsConfigSchema = z.object({
   autosaveDelayMs: z.number().int().min(200).max(10_000).default(800),
   /** Models the inline selection edits may invoke. Requests with any other
    *  model are rejected before they leave the deployment. */
-  allowedAiEditModels: z.array(z.string()).default([
-    'deepseek-v4.1-flash-free',
-    'glm-5.3-flash-free',
-  ]),
+  allowedAiEditModels: z.array(z.string()).default(['deepseek-v4.1-flash-free']),
 });
 
 export type TDocumentsConfig = z.infer<typeof documentsConfigSchema>;
