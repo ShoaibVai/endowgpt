@@ -208,6 +208,17 @@ const file: Schema<IMongoFile> = new Schema(
         type: Schema.Types.Mixed,
         default: undefined,
       },
+      /** Present only on files created by the native file-generation tools. */
+      generatedFile: {
+        version: { type: Number },
+        tool: { type: String },
+        kind: { type: String },
+        format: { type: String },
+        sheets: { type: Number },
+        rows: { type: Number },
+        slides: { type: Number },
+        blocks: { type: Number },
+      },
     },
     llmDeliveryPath: {
       /* What upload time inferred about delivery, from the endpoint and MIME type it saw.

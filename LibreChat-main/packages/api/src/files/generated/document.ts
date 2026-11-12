@@ -1,0 +1,206 @@
+import {
+  BorderStyle,
+  Document,
+  HeadingLevel,
+  Packer,
+  PageBreak,
+  Paragraph,
+  ShadingType,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType,
+} from 'docx';
+import type { GeneratedFileLimits } from './limits';
+import type { NormalizedDocumentBlock, NormalizedDocumentInput } from './schema';
+import type { RenderedGeneratedFile } from './types';
+import { GENERATED_FORMAT_MIME_TYPES } from './types';
+
+const TABLE_BORDER = { style: BorderStyle.SINGLE, size: 1, color: 'CBD5E1' } as const;
+const TABLE_HEADER_FILL = '1F2937';
+
+function headingLevel(level: 1 | 2 | 3): (typeof HeadingLevel)[keyof typeof HeadingLevel] {
+  if (level === 1) {
+    return HeadingLevel.HEADING_1;
+  }
+  if (level === 2) {
+    return HeadingLevel.HEADING_2;
+  }
+  return HeadingLevel.HEADING_3;
+}
+
+function paragraphFromBlock(block: NormalizedDocumentBlock): Array<Paragraph | Table> {
+  switch (block.type) {
+    case 'heading':
+      return [
+        new Paragraph({
+          heading: headingLevel(block.level),
+          spacing: { before: 240, after: 120 },
+          children: [new TextRun({ text: block.text })],
+        }),
+      ];
+    case 'paragraph':
+      return [
+        new Paragraph({
+          spacing: { after: 120 },
+          children: [new TextRun({ text: block.text })],
+        }),
+      ];
+    case 'list':
+      return block.items.map(
+        (item, index) =>
+          new Paragraph({
+            spacing: { after: 60 },
+            indent: { left: 360 },
+            children: [
+              new TextRun({
+                text: block.ordered ? `${index + 1}. ${item}` : `• ${item}`,
+              }),
+            ],
+          }),
+      );
+    case 'table':
+      return [documentTable(block)];
+    case 'pagebreak':
+      return [new Paragraph({ children: [new PageBreak()] })];
+  }
+}
+
+function documentTable(block: Extract<NormalizedDocumentBlock, { type: 'table' }>): Table {
+  const header = new TableRow({
+    tableHeader: true,
+    children: block.headers.map(
+      (cell) =>
+        new TableCell({
+          shading: { type: ShadingType.CLEAR, fill: TABLE_HEADER_FILL, color: 'auto' },
+          margins: { top: 80, bottom: 80, left: 100, right: 100 },
+          borders: {
+            top: TABLE_BORDER,
+            bottom: TABLE_BORDER,
+            left: TABLE_BORDER,
+            right: TABLE_BORDER,
+          },
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: cell, bold: true, color: 'FFFFFF' })],
+            }),
+          ],
+        }),
+    ),
+  });
+  const rows = block.rows.map(
+    (row) =>
+      new TableRow({
+        children: block.headers.map(
+          (_header, columnIndex) =>
+            new TableCell({
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              borders: {
+                top: TABLE_BORDER,
+                bottom: TABLE_BORDER,
+                left: TABLE_BORDER,
+                right: TABLE_BORDER,
+              },
+              children: [
+                new Paragraph({ children: [new TextRun({ text: row[columnIndex] ?? '' })] }),
+              ],
+            }),
+        ),
+      }),
+  );
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [header, ...rows],
+  });
+}
+
+function markdownTable(block: Extract<NormalizedDocumentBlock, { type: 'table' }>): string[] {
+  const escape = (value: string) => value.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  const lines = [
+    `| ${block.headers.map(escape).join(' | ')} |`,
+    `| ${block.headers.map(() => '---').join(' | ')} |`,
+  ];
+  for (const row of block.rows) {
+    lines.push(
+      `| ${block.headers.map((_header, index) => escape(row[index] ?? '')).join(' | ')} |`,
+    );
+  }
+  return lines;
+}
+
+function renderMarkdown(input: NormalizedDocumentInput): Buffer {
+  const lines: string[] = [];
+  for (const block of input.blocks) {
+    switch (block.type) {
+      case 'heading':
+        lines.push(`${'#'.repeat(block.level)} ${block.text}`, '');
+        break;
+      case 'paragraph':
+        lines.push(block.text, '');
+        break;
+      case 'list':
+        block.items.forEach((item, index) => {
+          lines.push(block.ordered ? `${index + 1}. ${item}` : `- ${item}`);
+        });
+        lines.push('');
+        break;
+      case 'table':
+        lines.push(...markdownTable(block), '');
+        break;
+      case 'pagebreak':
+        lines.push('---', '');
+        break;
+    }
+  }
+  return Buffer.from(lines.join('\n').trimEnd() + '\n', 'utf8');
+}
+
+/** Renders a validated document to docx or markdown bytes. */
+export async function renderDocument(
+  input: NormalizedDocumentInput,
+  limits: GeneratedFileLimits,
+): Promise<RenderedGeneratedFile> {
+  let buffer: Buffer;
+  if (input.format === 'md') {
+    buffer = renderMarkdown(input);
+  } else {
+    const children = input.blocks.flatMap(paragraphFromBlock);
+    const document = new Document({
+      creator: 'endowGPT',
+      title: input.filename,
+      description: 'Generated by endowGPT',
+      sections: [
+        {
+          properties: {
+            page: {
+              margin: { top: 720, right: 720, bottom: 720, left: 720 },
+            },
+          },
+          children,
+        },
+      ],
+    });
+    buffer = await Packer.toBuffer(document);
+  }
+
+  if (buffer.length > limits.maxBytes) {
+    throw new Error(
+      `The generated ${input.format.toUpperCase()} file exceeds the ${limits.maxBytes} byte limit`,
+    );
+  }
+
+  return {
+    buffer,
+    filename: input.filename,
+    format: input.format,
+    mimeType: GENERATED_FORMAT_MIME_TYPES[input.format],
+    counts: {
+      version: 1,
+      tool: 'create_document',
+      kind: 'document',
+      format: input.format,
+      blocks: input.blocks.length,
+    },
+  };
+}

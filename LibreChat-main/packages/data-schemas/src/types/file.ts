@@ -6,6 +6,7 @@ import type {
   RunFileProvenance,
   TFile,
   TFileWorkspaceImports,
+  TGeneratedFileMetadata,
 } from 'librechat-data-provider';
 
 export type FileStorageScope = {
@@ -235,6 +236,8 @@ export interface IMongoFile extends Omit<Document, 'model'> {
     routingMimeType?: string;
     /** Copies placed in attached workspaces. */
     workspaceImports?: TFileWorkspaceImports;
+    /** Present only on files created by the native file-generation tools. */
+    generatedFile?: TGeneratedFileMetadata;
   };
   /** Upload-time inference, not a durable contract. See the schema field for why. */
   llmDeliveryPath?: string;

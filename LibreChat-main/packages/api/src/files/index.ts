@@ -14,6 +14,7 @@ export * from './documents/crud';
 export * from './encode';
 export * from './filter';
 export * from './format';
+export * from './generated';
 export * from './mime';
 export * from './mistral/crud';
 export * from './ocr';

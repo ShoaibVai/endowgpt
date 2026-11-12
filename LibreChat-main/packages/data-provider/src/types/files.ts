@@ -161,6 +161,22 @@ export type RunFileProvenance = {
   inputFileIds: string[];
 };
 
+export type TGeneratedFileKind = 'spreadsheet' | 'document' | 'presentation';
+
+export type TGeneratedFileFormat = 'xlsx' | 'csv' | 'docx' | 'md' | 'pptx';
+
+/** Counts and identity for a file produced by the native file-generation tools. */
+export type TGeneratedFileMetadata = {
+  version: 1;
+  tool: string;
+  kind: TGeneratedFileKind;
+  format: TGeneratedFileFormat;
+  sheets?: number;
+  rows?: number;
+  slides?: number;
+  blocks?: number;
+};
+
 export type TFile = {
   _id?: string;
   __v?: number;
@@ -239,6 +255,8 @@ export type TFile = {
     routingMimeType?: string;
     /** Copies already placed in attached workspaces; see `TFileWorkspaceImports`. */
     workspaceImports?: TFileWorkspaceImports;
+    /** Present only on files created by the native file-generation tools. */
+    generatedFile?: TGeneratedFileMetadata;
   };
   llmDeliveryPath?: 'provider' | 'text' | 'none';
   createdAt?: string | Date;
@@ -281,12 +299,49 @@ export type TFileUpload = TFile & {
  * Legacy records pre-dating the field are surfaced as `'ready'` server-
  * side so existing attachments keep rendering normally.
  */
+export type TSpreadsheetPreviewCellStyle = {
+  fill?: string;
+  fontColor?: string;
+  bold?: boolean;
+  italic?: boolean;
+  align?: 'left' | 'center' | 'right';
+  numFmt?: string;
+};
+
+export type TSpreadsheetPreviewColumn = {
+  header: string;
+  key?: string;
+  width?: number;
+};
+
+export type TSpreadsheetPreviewSheet = {
+  name: string;
+  index: number;
+  columns: TSpreadsheetPreviewColumn[];
+  rows: unknown[][];
+  totalRows: number;
+  offset: number;
+  limit: number;
+  frozenRows: number;
+  autoFilter?: string;
+  styles?: Record<string, TSpreadsheetPreviewCellStyle>;
+};
+
+export type TSpreadsheetPreview = {
+  sheets: TSpreadsheetPreviewSheet[];
+  totalSheets: number;
+  totalRows: number;
+  truncated: boolean;
+};
+
 export type TFilePreview = {
   file_id: string;
   status: 'pending' | 'ready' | 'failed';
   text?: string;
   textFormat?: 'html' | 'text' | null;
   previewError?: string;
+  sheets?: TSpreadsheetPreviewSheet[];
+  sheetError?: string;
 };
 
 export type AvatarUploadResponse = {
