@@ -71,6 +71,9 @@ describe('SpreadsheetViewer', () => {
     render(<SpreadsheetViewer fileId="file-1" />);
 
     expect(screen.getByTestId('spreadsheet-viewer')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('spreadsheet-viewer').querySelector('.preview-scroll'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Grade')).toBeInTheDocument();
     expect(screen.getByText('Alice')).toBeInTheDocument();

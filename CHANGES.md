@@ -39,6 +39,7 @@ sandbox.
 | Chat UX                 | Centered 700–760px reading column, assistant author headers suppressed, developer header controls (model selector, presets, bookmarks, compare, trace, temporary chat) hidden, composer reduced to attach/mic/send, sidebar reduced to history plus the superadmin entry, developer settings tabs hidden.                                     |
 | Legacy data             | Old HTML/React/code artifact conversations keep readable fenced content; they do not crash or reopen a panel.                                                                                                                                                                                                                                 |
 | Spreadsheet preview     | The viewer reads its CSS modules by their real `spreadsheet-*` keys; workbook-driven column widths now render as side-by-side columns instead of a single stacked column.                                                                                                                                                                     |
+| File preview scrolling  | Spreadsheet, DOCX, Markdown, PDF, and legacy text previews share a `preview-scroll` container with a full-size 8px horizontal/vertical thumb and track, so wide sheets and long documents have an obvious scrollbar.                                                                                                                          |
 
 ## Core edits (LibreChat upstream)
 
@@ -202,6 +203,11 @@ LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
   that rode along with suggestion spans (now only the suggestion marks are
   stripped). Final report in `REPORT.md`; branding sweep and README ops guide
   finished.
+- **M9.2** — file-preview scrolling: the app-wide horizontal scrollbar is a
+  near-invisible `0.1em`; generated-file viewers now use a shared
+  `preview-scroll` class with an 8px thumb/track, including the spreadsheet's
+  horizontal axis. Applies to XLSX/CSV, DOCX, Markdown, PDF, and legacy text
+  previews.
 - **M9.1** — spreadsheet preview fix: `SpreadsheetViewer` destructured
   `styles.width/grid/canvas/row/cell`, but the CSS module exports
   `spreadsheet-width/grid/canvas/row/cell`, so the grid template and cell styles

@@ -105,7 +105,10 @@ export default function PdfViewer({ file }: { file: Blob }) {
           </Button>
         </div>
       </div>
-      <div ref={containerRef} className="bg-surface-tertiary min-h-0 flex-1 overflow-auto p-4">
+      <div
+        ref={containerRef}
+        className="preview-scroll bg-surface-tertiary min-h-0 flex-1 overflow-auto p-4"
+      >
         <Document
           key={renderKey}
           file={file}

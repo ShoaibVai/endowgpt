@@ -50,7 +50,7 @@ export default function ArtifactTabs({ artifact, isSharedConvo }: ArtifactTabsPr
   /* A conversation saved by an older build can still focus a stock artifact.
    * Its content is shown as readable text rather than a blank panel. */
   return (
-    <div className="h-full w-full overflow-auto p-6">
+    <div className="preview-scroll h-full w-full overflow-auto p-6">
       <pre className="text-text-primary font-mono text-sm leading-6 break-words whitespace-pre-wrap">
         {artifact.content}
       </pre>

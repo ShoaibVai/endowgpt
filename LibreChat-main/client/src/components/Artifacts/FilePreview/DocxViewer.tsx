@@ -62,7 +62,11 @@ export default function DocxViewer({ userId, fileId, shareId }: DocxViewerProps)
 
   return (
     <div className="bg-surface-tertiary relative h-full min-h-0">
-      <div ref={containerRef} className="h-full overflow-auto p-4" data-testid="docx-preview" />
+      <div
+        ref={containerRef}
+        className="preview-scroll h-full overflow-auto p-4"
+        data-testid="docx-preview"
+      />
       {((blob == null && !isError) || isLoading || rendering) && !renderError && (
         <div className="bg-surface-primary absolute inset-0">
           <PreviewSkeleton rows={8} />

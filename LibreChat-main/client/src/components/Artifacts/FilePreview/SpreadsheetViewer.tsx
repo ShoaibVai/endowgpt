@@ -192,7 +192,7 @@ export default function SpreadsheetViewer({ fileId }: { fileId?: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="spreadsheet-viewer">
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+      <div ref={scrollRef} className="preview-scroll min-h-0 flex-1 overflow-auto">
         <div
           className={cn(widthClass, 'bg-surface-secondary sticky top-0 z-20')}
           style={gridVariables}

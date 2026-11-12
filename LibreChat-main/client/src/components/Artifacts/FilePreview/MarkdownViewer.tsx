@@ -57,7 +57,7 @@ export default function MarkdownViewer({ userId, fileId, shareId }: MarkdownView
   }
 
   return (
-    <div className="h-full overflow-auto p-4" data-testid="markdown-preview">
+    <div className="preview-scroll h-full overflow-auto p-4" data-testid="markdown-preview">
       <MarkdownLite content={content} codeExecution={false} />
     </div>
   );
