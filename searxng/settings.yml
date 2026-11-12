@@ -15,6 +15,7 @@ use_default_settings:
       - brave
       - duckduckgo
       - wikipedia
+      - yandex
 
 general:
   instance_name: "endowGPT Search"
@@ -60,6 +61,9 @@ engines:
   - name: brave
     timeout: 2.5
   - name: duckduckgo
+    timeout: 2.5
+  - name: yandex
+    disabled: false
     timeout: 2.5
   - name: wikipedia
     timeout: 1.5

@@ -98,7 +98,7 @@ webSearch:
   searchProvider: "searxng"
   searxngInstanceUrl: "${SEARXNG_INSTANCE_URL}"
   searxngSearchOptions:
-    engines: "google,brave,duckduckgo,wikipedia"
+    engines: "google,brave,duckduckgo,yandex,wikipedia"
     language: "all"
     timeout: 10000
   scraperProvider: "firecrawl"
