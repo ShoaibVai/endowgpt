@@ -13,9 +13,10 @@ const db = require('~/models');
  * @param {object} params
  * @param {import('~/typedefs').ServerRequest} params.req
  * @param {import('@librechat/api').GeneratedFileLimits} params.limits
+ * @param {string} [params.fileStrategy]
  */
-function createGeneratedFilePersister({ req, limits }) {
-  const fileStrategy = req.config?.fileStrategy ?? FileSources.local;
+function createGeneratedFilePersister({ req, limits, fileStrategy: configuredStrategy }) {
+  const fileStrategy = configuredStrategy ?? req.config?.fileStrategy ?? FileSources.local;
   const { saveBuffer, deleteFile } = getStrategyFunctions(fileStrategy);
   if (typeof saveBuffer !== 'function') {
     throw new Error(`File storage strategy "${fileStrategy}" cannot store generated files`);

@@ -171,7 +171,11 @@ const loadTools = async ({
       throw new Error('File generation requires an authenticated request');
     }
     const limits = getGeneratedFileLimits();
-    const persist = createGeneratedFilePersister({ req, limits });
+    const persist = createGeneratedFilePersister({
+      req,
+      limits,
+      fileStrategy: fileStrategy ?? req.config?.fileStrategy,
+    });
     return factory({ limits, persist });
   };
 
