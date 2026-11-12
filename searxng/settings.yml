@@ -1,0 +1,66 @@
+# SearXNG settings for endowGPT.
+#
+# Mounted read-only at /etc/searxng/settings.yml. The server secret comes from
+# the SEARXNG_SECRET environment variable (SearXNG maps it to
+# server.secret_key); it is deliberately absent from this file.
+#
+# Design: a small, fast, private-instance engine set. SearXNG queries every
+# selected engine in parallel and waits up to outgoing.max_request_timeout, so
+# adding engines mostly adds latency. Keep this list short.
+
+use_default_settings:
+  engines:
+    keep_only:
+      - google
+      - bing
+      - brave
+      - duckduckgo
+      - wikipedia
+
+general:
+  instance_name: "endowGPT Search"
+
+server:
+  limiter: false          # private Docker network only; no Valkey needed
+  image_proxy: false
+  public_instance: false
+
+search:
+  formats:
+    - html
+    - json                # required by LibreChat
+  safe_search: 1          # moderate
+  autocomplete: ""        # no third-party autocomplete calls
+  default_lang: "en"
+  # No staged/early-return option exists in this SearXNG release. All selected
+  # engines run in parallel and the search is bounded by the outgoing timeouts.
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 60
+  suspended_times:
+    SearxEngineAccessDenied: 3600
+    SearxEngineCaptcha: 3600
+    SearxEngineTooManyRequests: 900
+    cf_SearxEngineCaptcha: 3600
+    cf_SearxEngineAccessDenied: 3600
+    recaptcha_SearxEngineCaptcha: 3600
+
+outgoing:
+  request_timeout: 3.0
+  max_request_timeout: 4.0
+  pool_connections: 100
+  enable_http2: true
+
+engines:
+  # google and bing ship disabled: true in this release; enable them here.
+  - name: google
+    disabled: false
+    timeout: 2.5
+  - name: bing
+    disabled: false
+    timeout: 2.5
+  - name: brave
+    timeout: 2.5
+  - name: duckduckgo
+    timeout: 2.5
+  - name: wikipedia
+    timeout: 1.5
