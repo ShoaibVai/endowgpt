@@ -454,7 +454,11 @@ describe('loadAgent', () => {
     );
 
     if (result) {
-      expect(result.tools).toEqual([]);
+      expect(result.tools).toEqual([
+        'create_spreadsheet',
+        'create_document',
+        'create_presentation',
+      ]);
       expect(result.instructions).toBe('Simple instructions');
     } else {
       expect(result).toBeFalsy();
@@ -1111,7 +1115,11 @@ describe('loadAgent', () => {
     );
 
     if (result) {
-      expect(result.tools).toEqual([]);
+      expect(result.tools).toEqual([
+        'create_spreadsheet',
+        'create_document',
+        'create_presentation',
+      ]);
     } else {
       expect(result).toBeFalsy();
     }
@@ -1244,7 +1252,12 @@ describe('loadAgent', () => {
       );
 
       if (result) {
-        expect(result.tools).toEqual(['tool_mcp_server1']);
+        expect(result.tools).toEqual([
+          'create_spreadsheet',
+          'create_document',
+          'create_presentation',
+          'tool_mcp_server1',
+        ]);
         expect(result.tools).not.toContain('malformed_tool_name');
         expect(result.tools).not.toContain('tool__server1');
         expect(result.tools).not.toContain('tool_mcp_server2');
