@@ -15,14 +15,20 @@ jest.mock('@librechat/data-schemas', () => ({
   SystemCapabilities: {},
 }));
 
+const mockGetSpreadsheetPreview = jest.fn();
+
 jest.mock('@librechat/api', () => ({
   refreshS3FileUrls: jest.fn(),
   resolveUploadErrorMessage: jest.fn(),
   verifyAgentUploadPermission: jest.fn(),
+  resolveDownloadPath: (file) => file.filepath,
+  getSafeErrorMetadata: () => ({ name: 'Error' }),
+  getSpreadsheetPreview: (...args) => mockGetSpreadsheetPreview(...args),
   hasAgentBasedFileAccess: (...args) =>
     jest.requireActual('@librechat/api').hasAgentBasedFileAccess(...args),
 }));
 
+const mockGetStrategyFunctions = jest.fn(() => ({}));
 const mockFindFileById = jest.fn();
 const mockGetFiles = jest.fn();
 const mockUpdateFile = jest.fn();
@@ -43,7 +49,7 @@ jest.mock('~/server/services/Files/process', () => ({
 }));
 
 jest.mock('~/server/services/Files/strategies', () => ({
-  getStrategyFunctions: jest.fn(() => ({})),
+  getStrategyFunctions: (...args) => mockGetStrategyFunctions(...args),
 }));
 
 jest.mock('~/server/controllers/assistants/helpers', () => ({
@@ -69,6 +75,7 @@ jest.mock('~/cache', () => ({
   getLogStores: jest.fn(() => ({ get: jest.fn(), set: jest.fn() })),
 }));
 
+const { Readable } = require('stream');
 const express = require('express');
 const request = require('supertest');
 const filesRouter = require('./files');
@@ -98,6 +105,79 @@ describe('GET /files/:file_id/preview', () => {
     mockUpdateFile.mockReset();
     mockGetAgents.mockReset();
     mockGetAgents.mockResolvedValue([]);
+    mockGetSpreadsheetPreview.mockReset();
+    mockGetStrategyFunctions.mockReset();
+    mockGetStrategyFunctions.mockReturnValue({});
+  });
+
+  it('adds parsed sheets for a generated spreadsheet attachment', async () => {
+    const file = {
+      file_id: 'sheet-1',
+      user: OWNER_USER_ID,
+      filename: 'Students.xlsx',
+      filepath: '/uploads/user-123/sheet-1__Students.xlsx',
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      source: 'local',
+      status: 'ready',
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      metadata: { generatedFile: { kind: 'spreadsheet', format: 'xlsx' } },
+    };
+    mockGetFiles.mockResolvedValueOnce([file]);
+    mockFindFileById.mockResolvedValueOnce({ ...file, text: null });
+    mockGetStrategyFunctions.mockReturnValue({
+      getDownloadStream: jest.fn(async () => Readable.from([Buffer.from('spreadsheet-bytes')])),
+    });
+    mockGetSpreadsheetPreview.mockResolvedValueOnce({
+      sheets: [{ name: 'Students', index: 0, columns: [], rows: [['Alice']], totalRows: 1 }],
+      totalSheets: 1,
+      totalRows: 1,
+      truncated: false,
+    });
+
+    const res = await request(buildApp())
+      .get('/files/sheet-1/preview?sheet=0&offset=0&limit=100')
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      file_id: 'sheet-1',
+      status: 'ready',
+      sheets: [{ name: 'Students', rows: [['Alice']] }],
+    });
+    expect(mockGetSpreadsheetPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileId: 'sheet-1',
+        filename: 'Students.xlsx',
+        sheet: 0,
+        offset: 0,
+        limit: 100,
+      }),
+    );
+  });
+
+  it('returns a stable sheet error code when parsing fails', async () => {
+    const file = {
+      file_id: 'sheet-bad',
+      user: OWNER_USER_ID,
+      filename: 'Broken.xlsx',
+      filepath: '/uploads/user-123/broken.xlsx',
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      source: 'local',
+      status: 'ready',
+      metadata: { generatedFile: { kind: 'spreadsheet', format: 'xlsx' } },
+    };
+    mockGetFiles.mockResolvedValueOnce([file]);
+    mockFindFileById.mockResolvedValueOnce({ ...file, text: null });
+    mockGetStrategyFunctions.mockReturnValue({
+      getDownloadStream: jest.fn(async () => Readable.from([Buffer.from('broken')])),
+    });
+    const parseError = new Error('raw parser detail');
+    parseError.code = 'parse-failed';
+    mockGetSpreadsheetPreview.mockRejectedValueOnce(parseError);
+
+    const res = await request(buildApp()).get('/files/sheet-bad/preview').expect(200);
+
+    expect(res.body).toMatchObject({ file_id: 'sheet-bad', sheetError: 'parse-failed' });
+    expect(JSON.stringify(res.body)).not.toContain('raw parser detail');
   });
 
   it('returns 404 when the file does not exist (auth check fails first via fileAccess)', async () => {

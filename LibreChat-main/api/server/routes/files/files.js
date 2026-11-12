@@ -24,6 +24,7 @@ const {
   resolveAssistantToolPermissions,
   resolveDownloadPath,
   pipeToResponse,
+  getSpreadsheetPreview,
 } = require('@librechat/api');
 const {
   isUUID,
@@ -452,6 +453,52 @@ router.get('/code/download/:session_id/:fileId', async (req, res) => {
   }
 });
 
+const SPREADSHEET_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Reads the stored bytes for a spreadsheet preview. Text-only and remote
+ * provider sources have no stream this route can safely consume, so they stay
+ * download-only.
+ */
+async function readSpreadsheetPreviewBuffer(req, file) {
+  const source = file.source ?? FileSources.local;
+  if (
+    source === FileSources.text ||
+    source === FileSources.openai ||
+    source === FileSources.azure ||
+    source === FileSources.execute_code
+  ) {
+    return null;
+  }
+  const { getDownloadStream } = getStrategyFunctions(source);
+  if (typeof getDownloadStream !== 'function') {
+    return null;
+  }
+  const stream = await getDownloadStream(req, resolveDownloadPath(file));
+  if (stream == null) {
+    return null;
+  }
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of stream) {
+    total += chunk.length;
+    if (total > SPREADSHEET_PREVIEW_MAX_BYTES) {
+      throw new Error('Spreadsheet preview exceeded its byte limit');
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+function wantsSpreadsheetPreview(req, file) {
+  return (
+    req.query.sheets === '1' ||
+    file.metadata?.generatedFile?.kind === 'spreadsheet' ||
+    file.metadata?.generatedFile?.format === 'xlsx' ||
+    file.metadata?.generatedFile?.format === 'csv'
+  );
+}
+
 /* Lazy-sweep cutoff: pending records older than this are marked failed
  * on the next poll. 2min is well past the 60s render ceiling, so any
  * `pending` past it is definitively orphaned. Tighter than the boot
@@ -519,6 +566,33 @@ router.get('/:file_id/preview', fileAccess, async (req, res) => {
       if (withText?.text != null) {
         payload.text = withText.text;
         payload.textFormat = withText.textFormat ?? null;
+      }
+      if (typeof getSpreadsheetPreview === 'function' && wantsSpreadsheetPreview(req, file)) {
+        try {
+          const buffer = await readSpreadsheetPreviewBuffer(req, file);
+          if (buffer != null) {
+            const preview = await getSpreadsheetPreview({
+              fileId: file_id,
+              filename: file.filename,
+              mimeType: file.type || '',
+              updatedAt: file.updatedAt,
+              buffer,
+              sheet: req.query.sheet != null ? Number(req.query.sheet) : undefined,
+              offset: req.query.offset != null ? Number(req.query.offset) : undefined,
+              limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+            });
+            payload.sheets = preview.sheets;
+          }
+        } catch (error) {
+          payload.sheetError =
+            error && typeof error.code === 'string' && error.code.length <= 64
+              ? error.code
+              : 'parse-failed';
+          logger.warn(
+            `[/files/:file_id/preview] Spreadsheet preview failed for ${file_id}`,
+            getSafeErrorMetadata(error),
+          );
+        }
       }
     } else if (status === 'failed' && file.previewError) {
       payload.previewError = file.previewError;
