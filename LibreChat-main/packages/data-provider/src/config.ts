@@ -5236,6 +5236,10 @@ export enum CacheKeys {
    */
   PULL_REQUESTS = 'PULL_REQUESTS',
   /**
+   * Per-user rate limit window for native file-generation tool calls.
+   */
+  FILE_TOOL_RATE_LIMIT = 'FILE_TOOL_RATE_LIMIT',
+  /**
    * Key for the app config namespace.
    */
   APP_CONFIG = 'APP_CONFIG',

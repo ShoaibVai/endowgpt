@@ -92,6 +92,44 @@ autosave, inline AI selection edits with per-change accept/reject, and per-docum
 version history with restore. Documents are stored in MongoDB per user +
 conversation + artifact id, and reopen from the originating conversation.
 
+### Native file generation
+
+The model can create real files instead of HTML artifacts that build a file in
+the browser:
+
+- `create_spreadsheet` -> `.xlsx` or `.csv` with styled headers, widths, frozen
+  headers, filters, cell formatting, and formulas
+- `create_document` -> `.docx` or `.md` from headings, paragraphs, lists,
+  tables, and page breaks
+- `create_presentation` -> `.pptx` with titled slides, bullets, notes, and
+  optional embedded images
+
+Each tool persists its bytes server-side, records the file against the signed-in
+user and conversation, and emits the normal `attachment` SSE event. The chat
+shows a file card with type, filename, and counts; Open loads the right-hand
+viewer and Download returns the original binary.
+
+The spreadsheet viewer is virtualized and pages through the stored workbook.
+DOCX renders through `docx-preview`, Markdown through the chat renderer, and PDF
+through `react-pdf`. PPTX needs LibreOffice for PPTX -> PDF conversion and is off
+unless `ENABLE_PPTX_PREVIEW=true`; without it the card remains downloadable and
+the panel shows a clean unavailable state. Viewer chunks are lazy: the initial
+bundle does not include `react-pdf`, `pdfjs-dist`, or `docx-preview`.
+
+Limits are environment-configurable in `.env.example`:
+`FILE_TOOL_MAX_SHEETS`, `FILE_TOOL_MAX_ROWS`, `FILE_TOOL_MAX_BYTES`,
+`FILE_TOOL_MAX_COLUMNS`, `FILE_TOOL_MAX_SLIDES`, `FILE_TOOL_MAX_BLOCKS`, and
+`FILE_TOOL_RATE_LIMIT_PER_MINUTE`. Files follow the normal retention sweep.
+
+To add a new generated type: add its format enum and MIME to
+`packages/api/src/files/generated/types.ts`, a renderer under
+`packages/api/src/files/generated/`, a zod branch in `schema.ts`, a tool entry
+in `packages/api/src/tools/fileGenerationDefs.ts`, and a viewer branch under
+`client/src/components/Artifacts/FilePreview/`. Keep the renderer in
+`@librechat/api`, persist through `persistGeneratedFile`, and return
+`{ generatedFile: TFile }` from the tool so the existing attachment pipeline
+handles the message card and SSE event.
+
 ### RAG
 
 Upload PDF, DOCX, TXT, or MD and ask about them; answers cite the retrieved
@@ -116,6 +154,7 @@ cd LibreChat-main
 npm run test:api -- --testPathPatterns documents      # documents API
 npm run test:client -- --testPathPatterns Document     # editor components
 node ../scripts/smoke.mjs                             # boot + both models
+node ../scripts/bench-files.mjs                       # 1k-row xlsx + cached preview
 ```
 
 The model smoke test skips with a clear message when `OPENCODE_API_KEY` is unset;

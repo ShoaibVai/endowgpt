@@ -74,6 +74,7 @@ const { createOpenIDSessionTokenProvider } = require('~/server/services/OpenIDSe
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { createGeneratedFilePersister } = require('~/server/services/Files/Generated/process');
+const { createFileToolRateLimiter } = require('~/server/services/Files/Generated/rateLimit');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools, checkCapability } = require('~/server/services/Config');
 const { getMCPServersRegistry } = require('~/config');
@@ -176,7 +177,8 @@ const loadTools = async ({
       limits,
       fileStrategy: fileStrategy ?? req.config?.fileStrategy,
     });
-    return factory({ limits, persist });
+    const assertRateLimit = createFileToolRateLimiter();
+    return factory({ limits, persist, rateLimit: () => assertRateLimit(req) });
   };
 
   const customConstructors = {

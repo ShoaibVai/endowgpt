@@ -133,6 +133,33 @@ describe('file generation tools', () => {
     expect(persist).not.toHaveBeenCalled();
   });
 
+  it('surfaces a rate-limit rejection without rendering or persisting', async () => {
+    const persist = jest.fn(async (file) => fakeFile(file.filename, file.mimeType));
+    const rateLimit = jest.fn(async () => {
+      const error = new Error('File generation rate limit reached. Try again later.');
+      (error as Error & { code: string }).code = 'FILE_TOOL_RATE_LIMIT';
+      throw error;
+    });
+    const tool = createSpreadsheetTool({ limits, persist, rateLimit });
+    const args = {
+      filename: 'Students.xlsx',
+      sheets: [
+        {
+          name: 'Students',
+          columns: [{ header: 'Name' }],
+          rows: [['Alice']],
+        },
+      ],
+    };
+    const result = await tool.invoke(args, {
+      toolCall: { id: 'call-rate-limited', name: tool.name, args },
+    } as never);
+
+    expect(result.content).toContain('rate limit');
+    expect(result.artifact).toBeNull();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it('creates a document and a presentation', async () => {
     const persist = jest.fn(async (file) => fakeFile(file.filename, file.mimeType));
     const document = createDocumentTool({ limits, persist });

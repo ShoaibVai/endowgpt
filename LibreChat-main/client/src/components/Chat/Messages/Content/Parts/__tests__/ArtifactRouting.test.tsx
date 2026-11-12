@@ -177,6 +177,7 @@ describe('Attachment routing for tool artifacts', () => {
     } as Partial<TAttachment>);
     renderWith(<Attachment attachment={jsx} />);
     expect(screen.getByText('App.tsx')).toBeInTheDocument();
+    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /com_ui_download.*App\.tsx/i })).toBeInTheDocument();
   });
 

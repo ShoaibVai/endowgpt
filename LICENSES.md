@@ -36,5 +36,9 @@ Notable bundled media and libraries:
 | marked (MIT), turndown+gfm (MIT) | Markdown ↔ HTML |
 | diff (MIT) | word diffing |
 | docx (MIT) | Word export |
+| docx-preview (Apache-2.0) | Word document preview |
+| exceljs (MIT) | XLSX generation |
+| pptxgenjs (MIT) | PPTX generation |
+| react-pdf (MIT), pdfjs-dist (Apache-2.0) | PDF preview |
 | jspdf (MIT) | PDF export |
 | endowGPT logo and reveal animation | endowGPT brand asset |

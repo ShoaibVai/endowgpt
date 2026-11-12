@@ -45,6 +45,8 @@ export type PersistGeneratedFile = (
 export type FileGenerationToolOptions = {
   limits: GeneratedFileLimits;
   persist: PersistGeneratedFile;
+  /** Throws when this user has exhausted the file-generation window. */
+  rateLimit?: () => Promise<void>;
   logger?: {
     error: (message: string, error?: unknown) => void;
   };
@@ -95,6 +97,7 @@ function createTool({
   description,
   schema,
   run,
+  rateLimit,
   logger,
 }: {
   name: string;
@@ -104,6 +107,7 @@ function createTool({
     | typeof documentInputSchema
     | typeof presentationInputSchema;
   run: (input: unknown, config: unknown) => Promise<[string, { generatedFile: TFile } | null]>;
+  rateLimit?: () => Promise<void>;
   logger?: FileGenerationToolOptions['logger'];
 }): DynamicStructuredTool {
   return new DynamicStructuredTool({
@@ -113,6 +117,7 @@ function createTool({
     responseFormat: 'content_and_artifact',
     func: async (input, _runManager, config) => {
       try {
+        await rateLimit?.();
         return await run(input, config);
       } catch (error) {
         logger?.error(`[${name}] Failed to create file`, error);
@@ -125,12 +130,14 @@ function createTool({
 export function createSpreadsheetTool({
   limits,
   persist,
+  rateLimit,
   logger,
 }: FileGenerationToolOptions): DynamicStructuredTool {
   return createTool({
     name: CREATE_SPREADSHEET_TOOL,
     description: SPREADSHEET_DESCRIPTION,
     schema: spreadsheetInputSchema,
+    rateLimit,
     logger,
     run: async (input, config) => {
       const normalized = normalizeSpreadsheetInput(
@@ -151,12 +158,14 @@ export function createSpreadsheetTool({
 export function createDocumentTool({
   limits,
   persist,
+  rateLimit,
   logger,
 }: FileGenerationToolOptions): DynamicStructuredTool {
   return createTool({
     name: CREATE_DOCUMENT_TOOL,
     description: DOCUMENT_DESCRIPTION,
     schema: documentInputSchema,
+    rateLimit,
     logger,
     run: async (input, config) => {
       const normalized = normalizeDocumentInput(
@@ -177,12 +186,14 @@ export function createDocumentTool({
 export function createPresentationTool({
   limits,
   persist,
+  rateLimit,
   logger,
 }: FileGenerationToolOptions): DynamicStructuredTool {
   return createTool({
     name: CREATE_PRESENTATION_TOOL,
     description: PRESENTATION_DESCRIPTION,
     schema: presentationInputSchema,
+    rateLimit,
     logger,
     run: async (input, config) => {
       const normalized = normalizePresentationInput(
