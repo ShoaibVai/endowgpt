@@ -60,6 +60,7 @@ describe('persistGeneratedFile', () => {
         tenantId: 'tenant-1',
       }),
     );
+    expect(deps.createFile).toHaveBeenCalledWith(expect.any(Object), true);
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
       user: 'user-1',
