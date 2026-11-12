@@ -32,6 +32,13 @@ services:
     networks:
       - default
       - websearch
+    environment:
+      # The core compose only passes a fixed environment list; web search
+      # needs these to resolve the ${VAR} references in librechat.yaml.
+      SEARXNG_INSTANCE_URL: ${SEARXNG_INSTANCE_URL:-http://searxng:8080}
+      FIRECRAWL_API_URL: ${FIRECRAWL_API_URL:-http://scraper:3002}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY must be set in .env}
+      FIRECRAWL_VERSION: ${FIRECRAWL_VERSION:-v1}
 
   # ---------------------------------------------------------------- SearXNG
   searxng:

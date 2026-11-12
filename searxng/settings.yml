@@ -12,7 +12,6 @@ use_default_settings:
   engines:
     keep_only:
       - google
-      - bing
       - brave
       - duckduckgo
       - wikipedia
@@ -51,11 +50,11 @@ outgoing:
   enable_http2: true
 
 engines:
-  # google and bing ship disabled: true in this release; enable them here.
+  # google ships disabled: true in this release; enable it here.
+  # Bing is intentionally excluded: in our tests it returned unrelated
+  # results (YouTube/Facebook/local-news pages) for AI-news queries. Re-add
+  # it only after verifying quality from the target VPS IP.
   - name: google
-    disabled: false
-    timeout: 2.5
-  - name: bing
     disabled: false
     timeout: 2.5
   - name: brave

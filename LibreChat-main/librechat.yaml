@@ -86,6 +86,37 @@ modelSpecs:
       fileSearch: true
 
 # -----------------------------------------------------------------------------
+# Web search: SearXNG for discovery, a Firecrawl-compatible scraper for page
+# content, no reranker. Both endpoints are private Docker hostnames, hence the
+# exact host:port entries in allowedAddresses (LibreChat's SSRF guard blocks
+# private destinations unless exempted).
+#
+# URL shape: LibreChat appends /<firecrawlVersion>/scrape to firecrawlApiUrl,
+# so the value is the base URL only: http://scraper:3002/v1/scrape.
+# -----------------------------------------------------------------------------
+webSearch:
+  searchProvider: "searxng"
+  searxngInstanceUrl: "${SEARXNG_INSTANCE_URL}"
+  searxngSearchOptions:
+    engines: "google,brave,duckduckgo,wikipedia"
+    language: "all"
+    timeout: 10000
+  scraperProvider: "firecrawl"
+  firecrawlApiUrl: "${FIRECRAWL_API_URL}"
+  firecrawlApiKey: "${FIRECRAWL_API_KEY}"
+  firecrawlVersion: "v1"
+  firecrawlOptions:
+    formats:
+      - "markdown"
+    onlyMainContent: true
+  rerankerType: "none"
+  scraperTimeout: 7500
+  safeSearch: 1
+  allowedAddresses:
+    - "searxng:8080"
+    - "scraper:3002"
+
+# -----------------------------------------------------------------------------
 # Interface / branding
 # -----------------------------------------------------------------------------
 interface:
@@ -101,6 +132,10 @@ interface:
   # Allow file search + citations everywhere.
   fileSearch: true
   fileCitations: true
+  # Keep the Web Search toggle in the composer/agents tool palette. The
+  # tool itself is LibreChat's built-in web_search capability; no agents
+  # endpoint block is needed for the ephemeral-agent toggle.
+  webSearch: true
   # Deployment theme: inline definitions use the shared token vocabulary
   # (`THEME_TOKENS`). The colors below restyle the shell around endowGPT's
   # palette; anything omitted falls back to LibreChat defaults.
