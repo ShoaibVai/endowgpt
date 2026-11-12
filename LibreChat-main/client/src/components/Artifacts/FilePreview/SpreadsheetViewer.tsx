@@ -12,11 +12,11 @@ import useSpreadsheetPreview from './useSpreadsheetPreview';
 import styles from './SpreadsheetViewer.module.css';
 
 const {
-  width: widthClass,
-  grid: gridClass,
-  canvas: canvasClass,
-  row: rowClass,
-  cell: cellClass,
+  'spreadsheet-width': widthClass,
+  'spreadsheet-grid': gridClass,
+  'spreadsheet-canvas': canvasClass,
+  'spreadsheet-row': rowClass,
+  'spreadsheet-cell': cellClass,
 } = styles;
 
 type CssVariables = React.CSSProperties & {

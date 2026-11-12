@@ -78,7 +78,15 @@ describe('SpreadsheetViewer', () => {
     expect(screen.getByText('A')).toBeInTheDocument();
     expect(screen.getByText('B')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Students/ })).toBeInTheDocument();
+
+    /** The CSS-module classes carry the workbook-driven grid template; without
+     *  them every column collapses into one stacked column. */
+    const headerRow = screen.getByText('Name').parentElement?.parentElement;
+    expect(headerRow).toHaveClass('spreadsheet-grid', 'grid');
+
     const styledCell = screen.getByText('Alice').parentElement as HTMLElement;
+    expect(styledCell).toHaveClass('spreadsheet-cell');
+    expect(styledCell.parentElement).toHaveClass('spreadsheet-row');
     expect(styledCell.style.getPropertyValue('--cell-fill')).toBe('#DBEAFE');
     expect(styledCell.style.getPropertyValue('--cell-weight')).toBe('600');
   });

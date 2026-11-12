@@ -38,6 +38,7 @@ sandbox.
 | Config                  | Removed `artifactUndocking`, `bundlerURL`, and `staticBundlerURL` from config schemas, startup payloads, shared-link config, and `librechat.example.yaml`.                                                                                                                                                                                    |
 | Chat UX                 | Centered 700–760px reading column, assistant author headers suppressed, developer header controls (model selector, presets, bookmarks, compare, trace, temporary chat) hidden, composer reduced to attach/mic/send, sidebar reduced to history plus the superadmin entry, developer settings tabs hidden.                                     |
 | Legacy data             | Old HTML/React/code artifact conversations keep readable fenced content; they do not crash or reopen a panel.                                                                                                                                                                                                                                 |
+| Spreadsheet preview     | The viewer reads its CSS modules by their real `spreadsheet-*` keys; workbook-driven column widths now render as side-by-side columns instead of a single stacked column.                                                                                                                                                                     |
 
 ## Core edits (LibreChat upstream)
 
@@ -201,6 +202,11 @@ LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
   that rode along with suggestion spans (now only the suggestion marks are
   stripped). Final report in `REPORT.md`; branding sweep and README ops guide
   finished.
+- **M9.1** — spreadsheet preview fix: `SpreadsheetViewer` destructured
+  `styles.width/grid/canvas/row/cell`, but the CSS module exports
+  `spreadsheet-width/grid/canvas/row/cell`, so the grid template and cell styles
+  were undefined and every column stacked into one. The component now reads the
+  real keys, and the test asserts the grid/row/cell classes reach the DOM.
 - **M9** — documents-only simplification: removed the stock artifact prompt,
   client types, panel modes, Sandpack/Monaco dependencies, undocking, and
   developer shell controls; kept the TipTap document editor, versions/restore,
