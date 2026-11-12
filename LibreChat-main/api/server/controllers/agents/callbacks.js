@@ -1023,6 +1023,34 @@ function createToolEndCallback({ req, res, artifactPromises, streamId = null, jo
       );
     }
 
+    const generatedFile = output.artifact.generatedFile;
+    if (
+      generatedFile != null &&
+      typeof generatedFile === 'object' &&
+      typeof generatedFile.file_id === 'string'
+    ) {
+      artifactPromises.push(
+        (async () => {
+          const attachment = {
+            ...generatedFile,
+            ...getAttachmentOwnership(metadata),
+            messageId: metadata.run_id,
+            toolCallId: output.tool_call_id,
+            conversationId: metadata.thread_id,
+          };
+          if (!streamId && !res.headersSent) {
+            return attachment;
+          }
+          writeAttachment(res, streamId, attachment, jobCreatedAt);
+          return attachment;
+        })().catch((error) => {
+          logger.error('Error processing generated file attachment:', error);
+          return null;
+        }),
+      );
+      return;
+    }
+
     if (output.artifact.content) {
       /** @type {FormattedContent[]} */
       const content = output.artifact.content;
@@ -1389,6 +1417,38 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
       );
     }
 
+    const generatedFile = output.artifact.generatedFile;
+    if (
+      generatedFile != null &&
+      typeof generatedFile === 'object' &&
+      typeof generatedFile.file_id === 'string'
+    ) {
+      artifactPromises.push(
+        (async () => {
+          const attachment = {
+            ...generatedFile,
+            ...getAttachmentOwnership(metadata),
+            messageId: metadata.run_id,
+            toolCallId: output.tool_call_id,
+            conversationId: metadata.thread_id,
+          };
+          if (res.headersSent && !res.writableEnded) {
+            writeResponsesAttachment(
+              res,
+              tracker,
+              buildResponsesAttachment(attachment, output.tool_call_id),
+              metadata,
+            );
+          }
+          return attachment;
+        })().catch((error) => {
+          logger.error('Error processing generated file attachment:', error);
+          return null;
+        }),
+      );
+      return;
+    }
+
     if (output.artifact.content) {
       /** @type {FormattedContent[]} */
       const content = output.artifact.content;
@@ -1547,6 +1607,7 @@ function buildResponsesAttachment(fileMetadata, toolCallId) {
     textFormat: fileMetadata.textFormat ?? null,
     status: fileMetadata.status,
     previewError: fileMetadata.previewError,
+    metadata: fileMetadata.metadata,
     workspaceChange: fileMetadata.workspaceChange,
   };
 }

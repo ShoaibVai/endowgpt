@@ -12,6 +12,7 @@ const {
   geminiToolkit,
   createAskUserQuestionTool,
   toToolParameters,
+  getFileGenerationCatalogTools,
 } = require('@librechat/api');
 const { toolkits } = require('~/app/clients/tools/manifest');
 
@@ -92,6 +93,7 @@ function loadAndFormatTools({ directory, adminFilter = [], adminIncluded = [] })
     createAskUserQuestionTool(),
     ...Object.values(oaiToolkit),
     ...Object.values(geminiToolkit),
+    ...getFileGenerationCatalogTools(),
   ];
   for (const toolInstance of basicToolInstances) {
     const formattedTool = formatToOpenAIAssistantTool(toolInstance);

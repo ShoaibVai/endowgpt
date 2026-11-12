@@ -24,6 +24,7 @@ import {
   validateMCPServerConfig,
 } from '~/mcp/utils';
 import { ASK_USER_QUESTION_TOOL_NAME } from '~/agents/hitl/askUserQuestionTool';
+import { FILE_GENERATION_TOOL_NAMES } from '~/tools/fileGenerationDefs';
 import { resolveMCPClientCapabilityProfile } from '~/mcp/capabilities';
 import { synthesizeBackgroundToolOptions } from '~/agents/background';
 import { mergeSynthesizedToolOptions } from '~/agents/selection';
@@ -129,6 +130,10 @@ export async function loadEphemeralAgent(
   if (ephemeralAgent?.ask_user_question === true || modelSpec?.askUserQuestion === true) {
     tools.push(ASK_USER_QUESTION_TOOL_NAME);
   }
+  /** Native file deliverables are available on every ephemeral chat. The
+   *  manifest still exposes them to saved agents, and the runtime factory
+   *  derives ownership from the authenticated request. */
+  tools.push(...FILE_GENERATION_TOOL_NAMES);
 
   if (mcpServers.size > 0) {
     const serverToolKeys = await mapWithConcurrency(

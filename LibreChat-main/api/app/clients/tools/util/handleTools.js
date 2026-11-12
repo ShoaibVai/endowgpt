@@ -32,6 +32,10 @@ const {
   withRequestCodeInputs,
   resolveAgentCodeExecution,
   resolveMCPClientCapabilityProfile,
+  createSpreadsheetTool,
+  createDocumentTool,
+  createPresentationTool,
+  getGeneratedFileLimits,
 } = require('@librechat/api');
 const {
   AuthType,
@@ -69,6 +73,7 @@ const { getMCPRequestContext } = require('~/server/services/MCPRequestContext');
 const { createOpenIDSessionTokenProvider } = require('~/server/services/OpenIDSessionRefresh');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
+const { createGeneratedFilePersister } = require('~/server/services/Files/Generated/process');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools, checkCapability } = require('~/server/services/Config');
 const { getMCPServersRegistry } = require('~/config');
@@ -159,6 +164,17 @@ const loadTools = async ({
     tavily_search_results_json: TavilySearchResults,
   };
 
+  /** The native file tools need the authenticated request for ownership and retention. */
+  const createFileGenerationTool = (factory) => {
+    const req = options.req;
+    if (!req?.user?.id) {
+      throw new Error('File generation requires an authenticated request');
+    }
+    const limits = getGeneratedFileLimits();
+    const persist = createGeneratedFilePersister({ req, limits });
+    return factory({ limits, persist });
+  };
+
   const customConstructors = {
     github_compare: () =>
       createGitHubCompareTool({
@@ -209,6 +225,9 @@ const loadTools = async ({
         fileStrategy,
       });
     },
+    create_spreadsheet: async () => createFileGenerationTool(createSpreadsheetTool),
+    create_document: async () => createFileGenerationTool(createDocumentTool),
+    create_presentation: async () => createFileGenerationTool(createPresentationTool),
   };
 
   const requestedTools = {};

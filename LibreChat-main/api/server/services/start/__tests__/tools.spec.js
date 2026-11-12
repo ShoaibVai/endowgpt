@@ -34,6 +34,15 @@ describe('loadAndFormatTools', () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
+  it('adds the native file-generation catalog to the cached tool list', () => {
+    const tools = loadAndFormatTools({ directory });
+
+    expect(tools.create_spreadsheet.function.name).toBe('create_spreadsheet');
+    expect(tools.create_document.function.name).toBe('create_document');
+    expect(tools.create_presentation.function.name).toBe('create_presentation');
+    expect(tools.create_spreadsheet.function.parameters.properties.sheets).toBeDefined();
+  });
+
   it.each([
     { adminIncluded: [] },
     { adminIncluded: ['Example.js', 'Example.spec.js', 'Example.test.js'] },

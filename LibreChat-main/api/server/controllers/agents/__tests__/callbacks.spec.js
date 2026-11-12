@@ -760,6 +760,42 @@ describe('createToolEndCallback', () => {
     ]);
   });
 
+  it('emits a generated file attachment without re-running code-output persistence', async () => {
+    res.headersSent = true;
+    const toolEndCallback = createToolEndCallback({ req, res, artifactPromises });
+    await toolEndCallback(
+      {
+        output: {
+          tool_call_id: 'call_generated',
+          artifact: {
+            generatedFile: {
+              file_id: 'file-generated',
+              filename: 'Students.xlsx',
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              filepath: '/uploads/user123/file-generated__Students.xlsx',
+              user: 'user123',
+              bytes: 1234,
+              object: 'file',
+              usage: 0,
+              embedded: false,
+            },
+          },
+        },
+      },
+      { run_id: 'run-generated', thread_id: 'thread-generated', executingAgentId: 'agent-a' },
+    );
+
+    const [attachment] = await Promise.all(artifactPromises);
+    expect(attachment).toMatchObject({
+      file_id: 'file-generated',
+      messageId: 'run-generated',
+      toolCallId: 'call_generated',
+      conversationId: 'thread-generated',
+      agentId: 'agent-a',
+    });
+    expect(res.write).toHaveBeenCalledWith(expect.stringContaining('event: attachment'));
+  });
+
   it.each(['createToolEndCallback', 'createResponsesToolEndCallback'])(
     '%s preserves memory payloads and their execution owner',
     async (factoryName) => {

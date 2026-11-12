@@ -78,6 +78,27 @@
     "authConfig": []
   },
   {
+    "name": "Create Spreadsheet",
+    "pluginKey": "create_spreadsheet",
+    "description": "Create a real .xlsx or .csv file with styled headers, column widths, frozen headers, filters, and optional cell formatting.",
+    "agentsOnly": true,
+    "authConfig": []
+  },
+  {
+    "name": "Create Document",
+    "pluginKey": "create_document",
+    "description": "Create a real .docx or .md document from headings, paragraphs, lists, tables, and page breaks.",
+    "agentsOnly": true,
+    "authConfig": []
+  },
+  {
+    "name": "Create Presentation",
+    "pluginKey": "create_presentation",
+    "description": "Create a real .pptx presentation with titled slides, bullets, speaker notes, and optional images.",
+    "agentsOnly": true,
+    "authConfig": []
+  },
+  {
     "name": "Calculator",
     "pluginKey": "calculator",
     "description": "Perform simple and complex mathematical calculations.",
