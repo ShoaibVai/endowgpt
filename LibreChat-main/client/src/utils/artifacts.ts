@@ -1058,8 +1058,9 @@ const OFFICE_HTML_BUCKETS: ReadonlySet<ToolArtifactType> = new Set([
 ]);
 
 export function detectArtifactTypeFromFile(
-  attachment: Partial<Pick<TFile, 'filename' | 'type' | 'text' | 'textFormat'>>,
+  attachment: Partial<Pick<TFile, 'filename' | 'type' | 'text' | 'textFormat' | 'metadata'>>,
 ): ToolArtifactType | null {
+  const generatedFile = attachment.metadata?.generatedFile;
   /* Compute the basename once and reuse it across the extension AND
    * bare-name lookups. Both `extensionOf(filename)` and
    * `bareNameOf(filename)` would otherwise split path separators
@@ -1111,6 +1112,11 @@ export function detectArtifactTypeFromFile(
    * by returning null here. The downgrade only matters when there's
    * actual text content that needs safe-escaping. */
   if (OFFICE_HTML_BUCKETS.has(type) && attachment.textFormat !== 'html') {
+    /* Native generated files carry their content in the stored binary and
+     * are rendered by the file viewer, not by the office HTML bucket. */
+    if (generatedFile != null) {
+      return type;
+    }
     if (!attachment.text) {
       return null;
     }
@@ -1118,6 +1124,7 @@ export function detectArtifactTypeFromFile(
   }
   if (
     !attachment.text &&
+    generatedFile == null &&
     type !== TOOL_ARTIFACT_TYPES.PLAIN_TEXT &&
     type !== TOOL_ARTIFACT_TYPES.MARKDOWN &&
     type !== TOOL_ARTIFACT_TYPES.CODE
@@ -1202,6 +1209,8 @@ export function fileToArtifact(
         | 'createdAt'
         | 'source'
         | 'user'
+        | 'metadata'
+        | 'bytes'
       >
   >,
   options?: FileToArtifactOptions,
@@ -1210,6 +1219,7 @@ export function fileToArtifact(
   if (!isToolArtifactType(type)) {
     return null;
   }
+  const generatedFile = attachment.metadata?.generatedFile;
   // Mirror the empty-text gate from `detectArtifactTypeFromFile` so a
   // caller that supplies `preClassifiedType` (and thus skips that gate)
   // can't accidentally hand HTML/React/Mermaid an empty buffer that
@@ -1217,6 +1227,7 @@ export function fileToArtifact(
   // tolerated empty — the markdown viewer renders empty cleanly.
   if (
     !attachment.text &&
+    generatedFile == null &&
     type !== TOOL_ARTIFACT_TYPES.PLAIN_TEXT &&
     type !== TOOL_ARTIFACT_TYPES.MARKDOWN &&
     type !== TOOL_ARTIFACT_TYPES.CODE
@@ -1267,6 +1278,8 @@ export function fileToArtifact(
       file_id: attachment.file_id,
       source: attachment.source,
       user: attachment.user,
+      ...(generatedFile != null ? { generatedFile } : {}),
+      ...(attachment.bytes != null ? { bytes: attachment.bytes } : {}),
     },
   };
 }

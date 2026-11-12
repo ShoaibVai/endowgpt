@@ -193,6 +193,7 @@ export default function Artifacts() {
       : null;
   const isMermaidArtifact =
     normalizeArtifactType(currentArtifact?.type ?? '') === TOOL_ARTIFACT_TYPES.MERMAID;
+  const isGeneratedFileArtifact = currentArtifact?.download?.generatedFile != null;
 
   const closeArtifacts = useCallback(() => {
     if (isMobile) {
@@ -268,7 +269,7 @@ export default function Artifacts() {
    * no useful rendered preview. Filter each down to the only meaningful
    * tab and label that tab with the file name instead of generic
    * "Code" / "Preview" choices. */
-  const isPreviewOnly = isPreviewOnlyArtifact(currentArtifact?.type);
+  const isPreviewOnly = isPreviewOnlyArtifact(currentArtifact?.type) || isGeneratedFileArtifact;
   const isCodeOnly = isCodeOnlyArtifact(currentArtifact?.type);
   let constrainedTab: 'preview' | 'code' | null = null;
   if (isPreviewOnly) {
@@ -556,7 +557,7 @@ export default function Artifacts() {
               {/* Refresh drives the Sandpack preview client; the Mermaid
                   renderer has no such client and offers its own retry, so the
                   action would spin over an unchanged diagram. */}
-              {displayedTab === 'preview' && !isMermaidArtifact && (
+              {displayedTab === 'preview' && !isMermaidArtifact && !isGeneratedFileArtifact && (
                 <Button
                   size="icon"
                   variant="ghost"
@@ -608,12 +609,14 @@ export default function Artifacts() {
                   }}
                 />
               )}
-              <CopyButton
-                isCopied={isCopied}
-                iconOnly
-                portalElement={overlayPortal}
-                onClick={handleCopyArtifact}
-              />
+              {!isGeneratedFileArtifact && (
+                <CopyButton
+                  isCopied={isCopied}
+                  iconOnly
+                  portalElement={overlayPortal}
+                  onClick={handleCopyArtifact}
+                />
+              )}
               {/* Mermaid diagrams route every download through the export
                   menu — SVG, PNG and the source — so the generic button does
                   not sit beside it offering a fourth, unlabelled option. */}

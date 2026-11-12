@@ -234,6 +234,37 @@ describe('Attachment routing for tool artifacts', () => {
     expect(screen.queryByTestId('mermaid-render')).not.toBeInTheDocument();
   });
 
+  it('renders a native FileCard for a generated spreadsheet without extracted text', () => {
+    const generated = baseAttachment({
+      file_id: 'generated-sheet-1',
+      filename: 'Students.xlsx',
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      bytes: 2048,
+      metadata: {
+        generatedFile: {
+          version: 1,
+          tool: 'create_spreadsheet',
+          kind: 'spreadsheet',
+          format: 'xlsx',
+          sheets: 2,
+          rows: 50,
+        },
+      },
+    } as unknown as Partial<TAttachment>);
+    renderWith(<Attachment attachment={generated} />);
+
+    expect(screen.getByTestId('generated-file-card')).toBeInTheDocument();
+    expect(screen.getByText('Students.xlsx')).toBeInTheDocument();
+    expect(screen.getByTestId('generated-file-meta')).toHaveTextContent('XLSX');
+    expect(screen.getByRole('button', { name: 'com_ui_generated_file_open' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(
+      screen.getByRole('button', { name: /com_ui_download.*Students\.xlsx/i }),
+    ).toBeInTheDocument();
+  });
+
   it.each([
     ['data.csv', 'text/csv'],
     ['workbook.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],

@@ -6,6 +6,7 @@ import { artifactRowKind, isCodeOnlyArtifact } from '~/utils/artifacts';
 import { displayFilename } from './attachmentTypes';
 import { useAttachmentLink } from './LogLink';
 import ArtifactRow from './ArtifactRow';
+import FileCard from './FileCard';
 
 interface ToolArtifactCardProps {
   attachment: TAttachment;
@@ -117,6 +118,12 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
   }, [artifact, existingEntry, isMyClaim, register]);
 
   useEffect(() => {
+    /* Native file deliverables are click-to-open. Opening a spreadsheet
+     * viewer over the conversation as soon as the tool returns would steal
+     * focus from the answer the user is reading. */
+    if (artifact.download?.generatedFile != null) {
+      return;
+    }
     if (isCodeOnlyArtifact(artifact.type)) {
       // Source-code artifacts (`.py`, `.js`, `.cpp`, `Dockerfile`, …) are
       // click-to-open only. They're typically supporting scripts the
@@ -152,7 +159,15 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
     // would surface the selection in the chip ("click to close") but
     // never actually open: `Presentation` gates rendering on visibility.
     open(artifact.id);
-  }, [artifact.id, artifact.type, fileId, ownerMessageId, consumeJustResolved, open]);
+  }, [
+    artifact.id,
+    artifact.type,
+    artifact.download?.generatedFile,
+    fileId,
+    ownerMessageId,
+    consumeJustResolved,
+    open,
+  ]);
 
   const { handleDownload } = useAttachmentLink({
     href: attachment.filepath ?? '',
@@ -181,6 +196,17 @@ const ToolArtifactCard = memo(({ attachment, artifact }: ToolArtifactCardProps) 
   // The artifact's stored `title` mirrors the on-disk `filename` for
   // tool artifacts, so re-derive the user-facing label rather than
   // showing the collision-suffixed name.
+  if (artifact.download?.generatedFile != null) {
+    return (
+      <FileCard
+        artifact={artifact}
+        isSelected={isSelected}
+        onOpen={handleOpen}
+        onDownload={handleDownload}
+      />
+    );
+  }
+
   const visibleTitle = displayFilename(artifact.title);
 
   return (

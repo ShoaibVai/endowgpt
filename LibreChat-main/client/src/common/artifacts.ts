@@ -1,3 +1,5 @@
+import type { TGeneratedFileMetadata } from 'librechat-data-provider';
+
 export interface CodeBlock {
   id: string;
   language: string;
@@ -21,6 +23,9 @@ export interface ArtifactDownload {
   file_id?: string;
   source?: string;
   user?: string;
+  /** Present only for files created by the native file-generation tools. */
+  generatedFile?: TGeneratedFileMetadata;
+  bytes?: number;
 }
 
 export interface Artifact {
