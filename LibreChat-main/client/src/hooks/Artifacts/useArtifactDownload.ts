@@ -2,83 +2,45 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToastContext } from '@librechat/client';
 import type { Artifact } from '~/common';
 import {
-  getArtifactDownloadFilename,
-  getOriginalArtifactFilename,
-  isPreviewOnlyArtifact,
-} from '~/utils/artifacts';
-import {
   useAttachmentLink,
   isLocallyStoredSource,
 } from '~/components/Chat/Messages/Content/Parts/LogLink';
-import useArtifactProps from '~/hooks/Artifacts/useArtifactProps';
-import { useArtifactCode } from '~/Providers/EditorContext';
+import { getArtifactDownloadFilename, getOriginalArtifactFilename } from '~/utils/artifacts';
 import useLocalize from '~/hooks/useLocalize';
 
 export interface ArtifactDownload {
   /** Briefly true after a file actually reached the user, for the check-mark swap. */
   isDownloaded: boolean;
-  /**
-   * Resolves to whether bytes actually reached the user, and every `false`
-   * has already been reported to them: the attachment route swallows fetch
-   * errors and toasts them itself, and the blob path below does the same,
-   * so a caller that announces completion (the mermaid export menu) gates
-   * it on this result and only has to speak in its own live region.
-   */
+  /** Resolves to whether bytes actually reached the user. */
   handleDownload: (event: React.MouseEvent<HTMLElement>) => Promise<boolean>;
 }
 
 /**
- * Saves an artifact to disk, picking between the original file and the
- * (possibly edited) panel content.
- *
- * A hook rather than logic inside the download button because mermaid
- * artifacts expose the same action as an item in their export menu instead
- * of a second icon beside it — two entry points, one decision about what the
- * bytes should be.
+ * Saves an artifact to disk. Generated files download through their original
+ * attachment route so the user gets the real binary; documents are serialized
+ * from the panel text.
  */
 export default function useArtifactDownload(artifact: Artifact): ArtifactDownload {
-  /* The buffer outlives a pane remount and belongs to whichever artifact last
-   * wrote it, so downloading another artifact must not export those edits; a
-   * copy this artifact left behind when another displaced it is still its own
-   * unsaved text and exports with it. */
-  const editedCode = useArtifactCode(artifact.id);
   const { showToast } = useToastContext();
   const localize = useLocalize();
   const [isDownloaded, setIsDownloaded] = useState(false);
-  const { fileKey: fileName } = useArtifactProps({ artifact });
   const resetTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(resetTimer.current), []);
 
-  /* Unedited file-backed artifacts download the original: cached extraction
-   * can be truncated or transformed. Edited content is exported as a blob. */
   const { download } = artifact;
-  /* Only take the original-file branch when `useAttachmentLink` can
-   * actually fetch something: a usable `filepath` (http target, share
-   * route, or code-output URL) OR enough metadata for the local-file
-   * API path (`isLocallyStoredSource` + file_id + user). A shared link
-   * to a non-snapshotted code-execution artifact strips source/user and
-   * deletes filepath while keeping file_id; without this guard that lone
-   * file_id would route to an empty fetch and download nothing instead
-   * of falling back to the preview-content blob. */
+  const generatedFile = download?.generatedFile;
+  /* Only take the original-file branch when `useAttachmentLink` can actually
+   * fetch something: a usable filepath or enough metadata for the local-file
+   * API path. A shared link that dropped those fields falls back to content. */
   const hasUsableRoute =
     (download?.filepath != null && download.filepath !== '') ||
     (download?.file_id != null &&
       download?.user != null &&
       isLocallyStoredSource(download?.source));
-  const hasEdits = editedCode != null && editedCode !== artifact.content;
-  /**
-   * Mermaid is no exception, even though the panel renders the diagram
-   * straight from `content`: that content is the cached extraction, and
-   * `extractUtf8` keeps only the first 512 KB plus a truncation marker, so
-   * a stored `.mmd` above that cap would otherwise be saved corrupt. When
-   * the route is missing (a share that dropped it) or the panel holds
-   * edits, the content blob below is still the right bytes.
-   */
-  const downloadOriginalFile =
-    hasUsableRoute && (isPreviewOnlyArtifact(artifact.type) || !hasEdits);
+  const fileKey = download?.filename ?? artifact.title ?? 'document.md';
   const { handleDownload: downloadAttachment } = useAttachmentLink({
     href: download?.filepath ?? '',
-    filename: getOriginalArtifactFilename(artifact, fileName),
+    filename: getOriginalArtifactFilename(artifact, fileKey),
     file_id: download?.file_id,
     user: download?.user,
     source: download?.source,
@@ -93,28 +55,29 @@ export default function useArtifactDownload(artifact: Artifact): ArtifactDownloa
   const handleDownload = useCallback(
     async (event: React.MouseEvent<HTMLElement>): Promise<boolean> => {
       try {
-        if (downloadOriginalFile) {
-          // Only flag success when a file was actually delivered; the
-          // attachment helper swallows fetch errors (e.g. an expired
-          // code-output URL or a 404 share download) and resolves either way.
+        if (hasUsableRoute) {
           const downloaded = await downloadAttachment(event);
           if (downloaded) {
             markDownloaded();
           }
           return downloaded;
         }
-        const content = editedCode ?? artifact.content;
-        if (content == null) {
-          /* Nothing to serialize and no route to fetch: the press has to
-           * say something, or it looks like the download worked. */
+        /* A generated file without its original route has no honest bytes to
+         * offer: the cached preview is not the binary. */
+        if (generatedFile != null) {
           showToast({ status: 'error', message: localize('com_ui_download_error') });
           return false;
         }
-        const blob = new Blob([content], { type: 'text/plain' });
+        const content = artifact.content;
+        if (content == null) {
+          showToast({ status: 'error', message: localize('com_ui_download_error') });
+          return false;
+        }
+        const blob = new Blob([content], { type: 'text/markdown' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = getArtifactDownloadFilename(artifact, fileName, content);
+        link.download = getArtifactDownloadFilename(artifact, fileKey, content);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -130,9 +93,9 @@ export default function useArtifactDownload(artifact: Artifact): ArtifactDownloa
     [
       artifact,
       downloadAttachment,
-      downloadOriginalFile,
-      editedCode,
-      fileName,
+      generatedFile,
+      fileKey,
+      hasUsableRoute,
       localize,
       markDownloaded,
       showToast,

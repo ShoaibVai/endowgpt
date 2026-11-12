@@ -55,7 +55,6 @@ endpoints:
 
 # -----------------------------------------------------------------------------
 # Model specs: the user-facing labels + per-model capabilities.
-#   `artifacts: true`  -> artifact panel and document prompts
 #   `fileSearch: true` -> ephemeral agent gets file-search (RAG) tooling
 # -----------------------------------------------------------------------------
 modelSpecs:
@@ -72,9 +71,8 @@ modelSpecs:
       showOnLanding: true
       conversation_starters:
         - "Draft a document"
-        - "Build an interactive page"
         - "Summarize a file"
-      artifacts: true
+        - "Plan my week"
       fileSearch: true
 
 # -----------------------------------------------------------------------------
@@ -113,14 +111,12 @@ webSearch:
 # -----------------------------------------------------------------------------
 interface:
   customWelcome: >-
-    What can I help you build today?
+    What would you like to get done?
 
-    Draft a document, explore an idea, or drop in a file — endowGPT is on it.
+    Ask a question, draft a document, or drop in a file — endowGPT is on it.
   landingHeading: "entity"
   landingFooter: true
   logoSplash: true
-  # Brand the artifact surface, keep the pane in the room.
-  artifactUndocking: true
   # Allow file search + citations everywhere.
   fileSearch: true
   fileCitations: true
@@ -186,7 +182,7 @@ interface:
 
 # Speech synthesis/stt are left at LibreChat defaults for this deployment.
 # -----------------------------------------------------------------------------
-# Documents (endowGPT artifact editor limits)
+# Documents (endowGPT document editor limits)
 # These mirror defaults in packages/data-provider/src/config.ts; the block is
 # what lets a deployment retune the editor without a rebuild.
 # -----------------------------------------------------------------------------

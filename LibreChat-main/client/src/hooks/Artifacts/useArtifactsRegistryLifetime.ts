@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useSetAtom } from 'jotai';
 import { useResetRecoilState } from 'recoil';
-import { artifactsActiveTab, artifactsOpenedArtifactId } from '~/components/Artifacts/state';
 import store from '~/store';
 
 /**
@@ -20,26 +18,21 @@ import store from '~/store';
  * self-heal subscription after this wipe lands.
  *
  * It also wipes on unmount, which is the host leaving: the pane's own cleanup
- * deliberately keeps the registry when it is only changing hosts (side panel,
- * mobile sheet, undocked window), so navigating away from this route — to a
- * shared conversation, say — has to be what clears it.
+ * deliberately keeps the registry when it is only changing hosts, so
+ * navigating away from this route — to a shared conversation, say — has to be
+ * what clears it.
  */
 export default function useArtifactsRegistryLifetime(
   conversationId: string | null | undefined,
 ): void {
   const resetArtifacts = useResetRecoilState(store.artifactsState);
   const resetCurrentArtifactId = useResetRecoilState(store.currentArtifactId);
-  const setActiveTab = useSetAtom(artifactsActiveTab);
-  const setOpenedArtifactId = useSetAtom(artifactsOpenedArtifactId);
   const prevConversationIdRef = useRef<string | null>(null);
 
-  /** The pane's view state belongs to the session the registry belongs to. */
   const endSession = useCallback(() => {
     resetArtifacts();
     resetCurrentArtifactId();
-    setActiveTab('preview');
-    setOpenedArtifactId(null);
-  }, [resetArtifacts, resetCurrentArtifactId, setActiveTab, setOpenedArtifactId]);
+  }, [resetArtifacts, resetCurrentArtifactId]);
 
   useEffect(() => {
     /* An absent id is a host that has nothing to report yet, not a different

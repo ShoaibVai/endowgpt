@@ -1278,6 +1278,8 @@
   "com_ui_archive_delete_error": "Failed to delete archived conversation",
   "com_ui_archive_error": "Failed to archive conversation",
   "com_ui_artifact_click": "Click to open",
+  "com_ui_close_document": "Close document",
+  "com_ui_open_document": "Open document",
   "com_ui_artifact_format_diagram": "Diagram",
   "com_ui_artifact_format_document": "Document",
   "com_ui_artifact_format_html": "HTML",

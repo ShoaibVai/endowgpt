@@ -96,10 +96,6 @@ const createRunBody = ({
     systemInstructions += promptPrefix;
   }
 
-  if (typeof endpointOption?.artifactsPrompt === 'string' && endpointOption.artifactsPrompt) {
-    systemInstructions += `\n${endpointOption.artifactsPrompt}`;
-  }
-
   if (systemInstructions.trim()) {
     body.additional_instructions = systemInstructions.trim();
   }

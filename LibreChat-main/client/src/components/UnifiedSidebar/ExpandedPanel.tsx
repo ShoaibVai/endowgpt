@@ -5,7 +5,6 @@ import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
 import type { NavLink } from '~/common';
 import { useShortcutAriaKey, useShortcutHint } from '~/hooks/useKeyboardShortcuts';
 import { useActivePanel, resolveActivePanel, DEFAULT_PANEL } from '~/Providers';
-import AgentMarketplaceButton from '~/components/Nav/AgentMarketplaceButton';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import useDirection, { inlineSide } from '~/hooks/Nav/useDirection';
 import useNewChat from '~/hooks/Conversations/useNewChat';
@@ -172,7 +171,6 @@ function ExpandedPanel({
         }
       />
       <NewChatButton setActive={setActive} switchToHistory={switchToHistory} />
-      <AgentMarketplaceButton />
       <div className="border-border-inset mx-2 border-b" />
       <div className="flex flex-col gap-1 overflow-y-auto">
         {links.map((link) => (

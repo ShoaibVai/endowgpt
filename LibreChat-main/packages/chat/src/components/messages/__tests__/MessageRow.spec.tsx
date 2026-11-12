@@ -198,66 +198,15 @@ describe('MessageRow', () => {
     expect(screen.getByRole('heading', { hidden: true })).toHaveClass('sr-only');
   });
 
-  it('keeps assistant identity visible beside an open reading column', () => {
+  it('renders assistant content without an author bar or avatar', () => {
     renderRow({ isCreatedByUser: false });
 
     const row = screen.getByLabelText('Assistant message');
 
     expect(row.querySelector('.agent-turn')).toHaveClass('flex-1');
-    expect(screen.getByTestId('message-icon')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Assistant/ })).toBeVisible();
-  });
-
-  it('carries the assistant avatar inside the heading without naming it', () => {
-    renderRow({ isCreatedByUser: false });
-
-    const avatar = screen.getByTestId('message-icon').parentElement;
-
-    /** The accessible name resolves only when `aria-hidden` excludes the avatar. */
-    expect(
-      screen.getByRole('heading', { name: 'Message from Assistant Model: gpt-5.6' }),
-    ).toContainElement(screen.getByTestId('message-icon'));
-    expect(avatar).toHaveAttribute('aria-hidden', 'true');
-    expect(avatar).toHaveClass('size-6');
-    expect(avatar).not.toHaveClass('md:absolute', 'md:left-0');
-  });
-
-  it('keeps the icon and provider name on the message content edge', () => {
-    renderRow({ isCreatedByUser: false });
-
-    const row = screen.getByLabelText('Assistant message');
-    const agentTurn = row.querySelector('.agent-turn');
-
-    expect(agentTurn).not.toHaveClass('md:ps-9', 'ps-9');
-    expect(row).not.toHaveClass('gap-3');
     expect(row.children).toHaveLength(1);
-    expect(screen.getAllByTestId('message-icon')).toHaveLength(1);
-  });
-
-  it('puts icon, name, and datetime on one bar across the message column', () => {
-    renderRow({ isCreatedByUser: false });
-
-    const heading = screen.getByRole('heading', { name: 'Message from Assistant Model: gpt-5.6' });
-
-    expect(heading).toHaveClass('w-full', 'gap-2');
-    expect(screen.getByTestId('message-timestamp')).toHaveClass('ms-auto');
-  });
-
-  it('keeps the model name ready to replace the provider on hover', () => {
-    renderRow({ isCreatedByUser: false });
-
-    expect(screen.getByText('Assistant')).toBeVisible();
-    expect(screen.getByText('gpt-5.6')).toHaveAttribute('aria-hidden', 'true');
-  });
-
-  /* The crossfade is pointer-only, so the header bar has to name the model in
-     the heading itself rather than leave it behind a hover. */
-  it('names the model in the heading for assistive technology', () => {
-    renderRow({ isCreatedByUser: false });
-
-    expect(
-      screen.getByRole('heading', { name: 'Message from Assistant Model: gpt-5.6' }),
-    ).toBeVisible();
+    expect(screen.queryByTestId('message-icon')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
   it('preserves the assistant turn marker for parallel content', () => {
@@ -297,8 +246,8 @@ describe('MessageRow', () => {
 
     expect(screen.getByLabelText('Assistant message')).toHaveClass(
       'sm:px-2',
-      'md:max-w-3xl',
-      'xl:max-w-4xl',
+      'md:max-w-[43.75rem]',
+      'xl:max-w-[47.5rem]',
     );
   });
 

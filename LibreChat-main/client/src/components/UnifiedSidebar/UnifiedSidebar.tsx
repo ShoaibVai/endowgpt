@@ -19,7 +19,6 @@ import {
 } from './constants';
 import { filesDialogTriggerAtom, showFilesDialogAtom } from '~/store/filesDialog';
 import { MobileHeader, MobileBottomBar, MobileShortcutTargets } from './mobile';
-import AgentMarketplaceButton from '~/components/Nav/AgentMarketplaceButton';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
 import useUnifiedSidebarLinks from '~/hooks/Nav/useUnifiedSidebarLinks';
 import { ChatFormProvider, ActivePanelProvider } from '~/Providers';
@@ -267,13 +266,6 @@ function UnifiedSidebar({
             onLeaveInsights={handleLeaveInsights}
             routeActiveId={isInsightsRoute ? 'insights' : undefined}
           />
-          {/* Above the panel rather than inside it: the marketplace is a
-              destination like the panels themselves, not a row of whichever
-              list happens to be showing, so it stays put while they change and
-              does not scroll away with the chats. */}
-          <div className="shrink-0 px-3 pt-2 empty:hidden">
-            <AgentMarketplaceButton layout="row" onNavigate={handleCollapse} />
-          </div>
           <nav id="chat-history-nav" className="bg-surface-sidebar min-h-0 flex-1 overflow-hidden">
             <SidePanelNav links={links} />
           </nav>

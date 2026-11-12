@@ -5,9 +5,9 @@ import { useSetRecoilState } from 'recoil';
 import { useLocation } from 'react-router-dom';
 import type { Pluggable } from 'unified';
 import type { Artifact } from '~/common';
+import { normalizeArtifactType, TOOL_ARTIFACT_TYPES } from '~/utils/artifacts';
 import { useMessageContext, useArtifactContext } from '~/Providers';
 import { logger, extractContent, isArtifactRoute } from '~/utils';
-import { normalizeArtifactType } from '~/utils/artifacts';
 import { artifactsState } from '~/store/artifacts';
 import ArtifactButton from './ArtifactButton';
 
@@ -62,11 +62,19 @@ export function Artifact({
   );
 
   const updateArtifact = useCallback(() => {
+    const type = props.type ?? defaultType;
+    /* Only the editable-document directive owns a panel surface. Any other
+     * `:::artifact` block — HTML, React, SVG, Mermaid, code, or a stock
+     * Markdown artifact from an older conversation — is unwrapped so its
+     * fenced content renders as ordinary Markdown in the message. */
+    if (normalizeArtifactType(type) !== TOOL_ARTIFACT_TYPES.DOCUMENT) {
+      return;
+    }
+
     const content = extractContent(props.children);
     logger.log('artifacts', 'updateArtifact: content.length', content.length);
 
     const title = props.title ?? defaultTitle;
-    const type = props.type ?? defaultType;
     const identifier = props.identifier ?? defaultIdentifier;
     const artifactKey = `${identifier}_${type}_${title}_${messageId}`
       .replace(/\s+/g, '_')
@@ -124,6 +132,10 @@ export function Artifact({
     resetCounter();
     updateArtifact();
   }, [updateArtifact, resetCounter]);
+
+  if (normalizeArtifactType(props.type ?? defaultType) !== TOOL_ARTIFACT_TYPES.DOCUMENT) {
+    return <>{props.children}</>;
+  }
 
   return <ArtifactButton artifact={artifact} />;
 }

@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { getDefaultStore } from 'jotai';
 import { act, render } from '@testing-library/react';
 import { RecoilRoot, useRecoilCallback } from 'recoil';
 import type { TConversation } from 'librechat-data-provider';
 import type { MutableSnapshot } from 'recoil';
 import type { Artifact } from '~/common';
-import { artifactsActiveTab, artifactsOpenedArtifactId } from '~/components/Artifacts/state';
 import useArtifactsRegistryLifetime from '../useArtifactsRegistryLifetime';
 import store from '~/store';
 
 const buildArtifact = (id: string): Artifact => ({
   id,
   title: id,
-  type: 'text/html',
-  content: '<h1>x</h1>',
+  type: 'application/vnd.endowgpt.document',
+  content: '# x',
   messageId: 'msg-1',
   lastUpdateTime: 1,
 });
@@ -25,8 +23,6 @@ interface HarnessHandle {
   setConversation: (conversationId: string | null | undefined) => void;
   readArtifacts: () => Record<string, Artifact | undefined> | null;
   readCurrentId: () => string | null;
-  readActiveTab: () => string;
-  readOpenedArtifactId: () => string | null;
 }
 
 const Harness = ({
@@ -58,8 +54,6 @@ const Harness = ({
       setConversation: setConversationId,
       readArtifacts,
       readCurrentId,
-      readActiveTab: () => getDefaultStore().get(artifactsActiveTab),
-      readOpenedArtifactId: () => getDefaultStore().get(artifactsOpenedArtifactId),
     };
   }
   return null;
@@ -115,10 +109,7 @@ describe('useArtifactsRegistryLifetime', () => {
    * wipe the next panel open — in the next chat or the next shared link —
    * would list the previous conversation's artifacts, and the pane would open
    * on the tab and artifact the reader left behind. */
-  it('wipes all registry and pane session state when the passed identity changes', () => {
-    const jotaiStore = getDefaultStore();
-    jotaiStore.set(artifactsActiveTab, 'code');
-    jotaiStore.set(artifactsOpenedArtifactId, 'leftover-from-A');
+  it('wipes all registry state when the passed identity changes', () => {
     const handle = renderHarness({
       conversationId: 'shared-A',
       artifacts: { 'leftover-from-A': buildArtifact('leftover-from-A') },
@@ -129,8 +120,6 @@ describe('useArtifactsRegistryLifetime', () => {
 
     expect(handle.readArtifacts()).toBeNull();
     expect(handle.readCurrentId()).toBeNull();
-    expect(handle.readActiveTab()).toBe('preview');
-    expect(handle.readOpenedArtifactId()).toBeNull();
   });
 
   it('keeps the registry through an absent id while shared data is loading', () => {

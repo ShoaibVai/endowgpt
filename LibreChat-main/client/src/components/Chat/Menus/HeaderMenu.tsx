@@ -1,64 +1,31 @@
 import { useState, useId } from 'react';
+import { Ellipsis } from 'lucide-react';
 import * as Ariakit from '@ariakit/react';
-import { PermissionTypes, Permissions } from 'librechat-data-provider';
 import { DropdownPopup, TooltipAnchor, Button } from '@librechat/client';
-import { BookmarkFilledIcon, BookmarkIcon } from '@radix-ui/react-icons';
-import { Ellipsis, PlusCircle, HatGlasses, Check, ChartNoAxesGantt } from 'lucide-react';
 import type { TStartupConfig } from 'librechat-data-provider';
-import type { TraceControl } from '~/components/Chat/Trace';
 import type * as t from '~/common';
-import useTemporaryChat from '~/hooks/Conversations/useTemporaryChat';
-import { usePullRequestMenu } from '~/components/Chat/PullRequest';
-import useBookmarkItems from '~/hooks/Sharing/useBookmarkItems';
-import useMultiConvo from '~/hooks/Conversations/useMultiConvo';
-import { BookmarkContext } from '~/Providers/BookmarkContext';
 import useChatOptions from '~/hooks/Sharing/useChatOptions';
-import { useHasAccess, useLocalize } from '~/hooks';
+import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 /**
- * Mobile overflow menu. Collapses the header's secondary actions behind a
- * single control so the bar holds four targets instead of seven. Each action's
- * behaviour and visibility rule comes from the hook that also drives its
- * desktop button, so the two surfaces cannot drift apart.
+ * Mobile overflow menu. With the developer controls gone, the only actions left
+ * are the ones that leave the conversation: share and export.
  */
 export default function HeaderMenu({
   startupConfig,
-  trace,
   className,
   readOnly = false,
-  pullRequestConversationId,
 }: {
   startupConfig?: TStartupConfig;
   /** A read-only subagent thread offers share and export but no edits to the chat. */
   readOnly?: boolean;
-  /** Owned by the header, which also renders the desktop trace button from it. */
-  trace?: TraceControl;
-  /** The saved conversation whose pull request this menu offers; none for a new chat or a child thread. */
-  pullRequestConversationId?: string;
   className?: string;
 }) {
   const localize = useLocalize();
   const menuId = useId();
   const [isOpen, setIsOpen] = useState(false);
 
-  const hasAccessToBookmarks = useHasAccess({
-    permissionType: PermissionTypes.BOOKMARKS,
-    permission: Permissions.USE,
-  });
-  const hasAccessToMultiConvo = useHasAccess({
-    permissionType: PermissionTypes.MULTI_CONVO,
-    permission: Permissions.USE,
-  });
-  const hasAccessToTemporaryChat = useHasAccess({
-    permissionType: PermissionTypes.TEMPORARY_CHAT,
-    permission: Permissions.USE,
-  });
-
-  const pullRequest = usePullRequestMenu(pullRequestConversationId ?? '');
-  const multiConvo = useMultiConvo();
-  const temporary = useTemporaryChat();
-  const bookmarks = useBookmarkItems({ enabled: hasAccessToBookmarks === true });
   const exportShare = useChatOptions({
     isSharedButtonEnabled: startupConfig?.sharedLinksEnabled ?? false,
     readOnly,
@@ -66,76 +33,10 @@ export default function HeaderMenu({
     closeMenu: () => setIsOpen(false),
   });
 
-  const showBookmarks = hasAccessToBookmarks === true && bookmarks.show;
-  const showCompare = hasAccessToMultiConvo === true && multiConvo.show;
-  const showTemporary =
-    (hasAccessToTemporaryChat === true || temporary.isEnforced) && temporary.show;
-
   const items: t.MenuItemProps[] = [];
 
-  /** `separate` marks an entry as *being* a divider, so it needs its own slot. */
-  const pushGroup = (...group: t.MenuItemProps[]) => {
-    if (items.length > 0) {
-      items.push({ separate: true });
-    }
-    items.push(...group);
-  };
-
-  if (showBookmarks) {
-    items.push({
-      id: 'header-bookmarks',
-      label: localize('com_ui_bookmarks'),
-      icon: bookmarks.hasBookmarks ? (
-        <BookmarkFilledIcon className="text-text-secondary size-4" />
-      ) : (
-        <BookmarkIcon className="text-text-secondary size-4" />
-      ),
-      subItems: bookmarks.items,
-    });
-  }
-
-  if (showCompare) {
-    items.push({
-      id: 'header-compare',
-      label: localize('com_ui_add_multi_conversation'),
-      icon: <PlusCircle className="text-text-secondary size-4" />,
-      onClick: multiConvo.addConversation,
-    });
-  }
-
-  if (trace?.show === true) {
-    pushGroup({
-      id: 'header-trace',
-      label: localize('com_ui_trace_view'),
-      icon: <ChartNoAxesGantt className="text-text-secondary size-4" />,
-      onClick: trace.open,
-    });
-  }
-
-  if (pullRequest.item != null) {
-    pushGroup(pullRequest.item);
-  }
-
   if (exportShare.show) {
-    pushGroup(...exportShare.items);
-  }
-
-  if (showTemporary) {
-    pushGroup({
-      id: 'header-temporary',
-      label: temporary.isEnforced
-        ? localize('com_ui_temporary_enforced')
-        : localize('com_ui_temporary'),
-      ariaChecked: temporary.isTemporary,
-      disabled: temporary.isEnforced,
-      className: temporary.isTemporary ? 'bg-surface-active' : undefined,
-      icon: temporary.isTemporary ? (
-        <Check className="text-text-primary size-4" />
-      ) : (
-        <HatGlasses className="text-text-secondary size-4" />
-      ),
-      onClick: temporary.toggle,
-    });
+    items.push(...exportShare.items);
   }
 
   if (items.length === 0) {
@@ -148,7 +49,7 @@ export default function HeaderMenu({
     : localize('com_ui_more_options');
 
   return (
-    <BookmarkContext.Provider value={{ bookmarks: bookmarks.bookmarks }}>
+    <>
       <DropdownPopup
         portal={true}
         menuId={menuId}
@@ -187,9 +88,7 @@ export default function HeaderMenu({
           />
         }
       />
-      {showBookmarks && bookmarks.dialog}
       {exportShare.dialogs}
-      {pullRequest.dialog}
-    </BookmarkContext.Provider>
+    </>
   );
 }

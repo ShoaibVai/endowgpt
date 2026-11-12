@@ -29,23 +29,21 @@ import type { SeedMessage } from '../db';
  */
 
 const ROOT_PARENT = '00000000-0000-0000-0000-000000000000';
-const ARTIFACT_TEXT = [
-  ':::artifact{identifier="e2e-v4-panel" type="application/vnd.code" title="panel.py"}',
-  '```python',
-  'print("panel")',
-  '```',
+const DOCUMENT_TEXT = [
+  ':::artifact{identifier="e2e-v4-panel" type="application/vnd.endowgpt.document" title="plan.md"}',
+  '# Plan',
   ':::',
 ].join('\n');
 const TWO_PARAGRAPHS = 'The first paragraph.\n\nThe second paragraph.';
 const BUILDER_SELECT_CLASSES =
   'rounded-lg border border-token-border-medium bg-transparent px-2 py-0 text-sm';
 
-/** Seed one assistant turn carrying an artifact and open its panel. */
-async function openArtifactPanel(page: Page, conversationId: string): Promise<void> {
+/** Seed one assistant turn carrying a document and open its panel. */
+async function openDocumentPanel(page: Page, conversationId: string): Promise<void> {
   const message: SeedMessage = {
     messageId: randomUUID(),
     parentMessageId: ROOT_PARENT,
-    text: ARTIFACT_TEXT,
+    text: DOCUMENT_TEXT,
     isCreatedByUser: false,
     sender: 'Assistant',
     model: 'mock-model-a',
@@ -63,34 +61,10 @@ async function openArtifactPanel(page: Page, conversationId: string): Promise<vo
 }
 
 test.describe('Tailwind v4 rendering', () => {
-  /** The artifact panel and its resize handle are desktop surfaces: the side
+  /** The document panel and its resize handle are desktop surfaces: the side
    *  panel group does not mount below `md`, so the scenarios that read them
    *  declare the viewport they describe instead of inheriting a phone. */
   test.use({ viewport: { width: 1280, height: 900 } });
-
-  test('a small blur surface still blurs by four pixels @scenario:a-small-blur-surface-still-blurs-by-four-pixels', async ({
-    page,
-  }) => {
-    test.setTimeout(120_000);
-    const conversationId = randomUUID();
-    try {
-      await openArtifactPanel(page, conversationId);
-
-      /** The artifact panel's refresh scrim stands in for the six small-blur
-       *  sites the upgrade touched: v3's `blur-sm` was 4px, v4's is 8px, and the
-       *  4px step is now called `blur-xs`. The scrim is always mounted, so its
-       *  filter is readable while it is still transparent. */
-      const scrim = page.locator('#artifact-viewer [role="status"]').first();
-      await expect(scrim).toBeAttached({ timeout: 30000 });
-
-      const { backdropFilter } = await computedStyles(scrim, ['backdropFilter']);
-      expect(backdropFilter).toBe('blur(4px)');
-      expect(backdropFilter).not.toBe('blur(8px)');
-    } finally {
-      await deleteMessagesByConversation([conversationId]);
-      await deleteConversations([conversationId]);
-    }
-  });
 
   test('the resize handle border follows the theme @scenario:the-resize-handle-border-follows-the-theme', async ({
     page,
@@ -102,7 +76,7 @@ test.describe('Tailwind v4 rendering', () => {
      *  theme — and only the role ships with the package. */
     await useStoredTheme(page, 'dark');
     try {
-      await openArtifactPanel(page, conversationId);
+      await openDocumentPanel(page, conversationId);
       await expect(page.locator('html')).toHaveClass(/(^|\s)dark(\s|$)/);
 
       /** The panel-group separator, not the sidebar's resize strip: only this
@@ -339,7 +313,7 @@ test.describe('Tailwind v4 rendering', () => {
     test.setTimeout(120_000);
     const conversationId = randomUUID();
     try {
-      await openArtifactPanel(page, conversationId);
+      await openDocumentPanel(page, conversationId);
 
       const forbidden = await page.evaluate(() => {
         // Container queries are intentional and covered by usage.spec.ts.

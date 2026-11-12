@@ -1033,7 +1033,6 @@ export const defaultAgentCapabilities = [
   AgentCapabilities.execute_code,
   AgentCapabilities.file_search,
   AgentCapabilities.web_search,
-  AgentCapabilities.artifacts,
   AgentCapabilities.subagents,
   AgentCapabilities.actions,
   AgentCapabilities.context,
@@ -3192,10 +3191,6 @@ export const interfaceSchema = z
     webSearch: z.boolean().optional(),
     contextUsage: z.boolean().optional(),
     contextCost: z.boolean().optional(),
-    /** Opening the artifacts pane in its own browser window. Enabled by
-     *  default; a deployment that cannot use popups can turn it off and keep
-     *  the docked pane. */
-    artifactUndocking: z.boolean().optional(),
     /** Asks each viewer for consent before Google Tag Manager (`ANALYTICS_GTM_ID`)
      *  loads. A deployment that settles consent itself, such as an internal one
      *  covered by its own policy, can set false to load the container without the
@@ -3435,7 +3430,6 @@ export const interfaceSchema = z
     webSearch: true,
     contextUsage: true,
     contextCost: false,
-    artifactUndocking: true,
     feedback: true,
     peoplePicker: {
       users: true,
@@ -3771,8 +3765,6 @@ export type TStartupConfig = {
   analyticsGtmId?: string;
   rum?: TRumConfig;
   clientLimits?: TClientLimits;
-  bundlerURL?: string;
-  staticBundlerURL?: string;
   /** Whether the deployment has a configured RAG service. */
   ragEnabled?: boolean;
   sharePointFilePickerEnabled?: boolean;
@@ -3824,19 +3816,11 @@ export type TStartupConfig = {
 
 export type TSharedLinkStartupInterface = Pick<
   Partial<TInterfaceConfig>,
-  | 'privacyPolicy'
-  | 'termsOfService'
-  | 'codeHighlightThrottleMs'
-  | 'theme'
-  | 'artifactUndocking'
-  | 'analyticsConsent'
+  'privacyPolicy' | 'termsOfService' | 'codeHighlightThrottleMs' | 'theme' | 'analyticsConsent'
 >;
 
 export type TSharedLinkStartupConfig = Pick<TStartupConfig, 'appTitle'> &
-  Pick<
-    Partial<TStartupConfig>,
-    'analyticsGtmId' | 'bundlerURL' | 'customFooter' | 'staticBundlerURL'
-  > & {
+  Pick<Partial<TStartupConfig>, 'analyticsGtmId' | 'customFooter'> & {
     interface?: TSharedLinkStartupInterface;
   };
 

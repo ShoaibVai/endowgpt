@@ -112,7 +112,6 @@ export type TEndpointOption = Pick<
   // File attachments (processed by middleware)
   attachments?: TAttachment[];
   // Generated prompts
-  artifactsPrompt?: string;
   // Agent-specific fields
   agent?: Promise<Agent>;
   // Client-specific options

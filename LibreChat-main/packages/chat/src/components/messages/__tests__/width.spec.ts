@@ -1,7 +1,9 @@
 import { getMessageRowWidthClass } from '../width';
 
 it('uses the standard reading column by default', () => {
-  expect(getMessageRowWidthClass()).toBe('w-full sm:px-2 md:max-w-3xl xl:max-w-4xl');
+  expect(getMessageRowWidthClass()).toBe(
+    'w-full sm:px-2 md:max-w-[43.75rem] xl:max-w-[47.5rem]',
+  );
 });
 
 it('widens parallel content', () => {

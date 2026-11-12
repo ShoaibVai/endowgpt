@@ -1,10 +1,8 @@
-const { generateArtifactsPrompt } = require('@librechat/api');
 const { removeNullishValues } = require('librechat-data-provider');
 const { getAssistant } = require('~/models');
 
 const buildOptions = async (endpoint, parsedBody) => {
-  const { promptPrefix, assistant_id, iconURL, greeting, spec, artifacts, ...modelOptions } =
-    parsedBody;
+  const { promptPrefix, assistant_id, iconURL, greeting, spec, ...modelOptions } = parsedBody;
   const endpointOption = removeNullishValues({
     endpoint,
     promptPrefix,
@@ -28,10 +26,6 @@ const buildOptions = async (endpoint, parsedBody) => {
         updatedAt: assistantDoc.updatedAt,
       };
     }
-  }
-
-  if (typeof artifacts === 'string') {
-    endpointOption.artifactsPrompt = generateArtifactsPrompt({ endpoint, artifacts });
   }
 
   return endpointOption;

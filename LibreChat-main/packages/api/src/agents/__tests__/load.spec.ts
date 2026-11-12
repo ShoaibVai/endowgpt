@@ -465,6 +465,33 @@ describe('loadAgent', () => {
     }
   });
 
+  test('does not carry a legacy artifact capability onto the ephemeral agent', async () => {
+    const { EPHEMERAL_AGENT_ID } = Constants;
+
+    const result = await loadAgent(
+      {
+        req: {
+          user: { id: 'user123' },
+          body: {
+            ephemeralAgent: {
+              artifacts: 'default',
+              file_search: true,
+            },
+          },
+        },
+        agent_id: EPHEMERAL_AGENT_ID as string,
+        endpoint: 'openai',
+        model_parameters: { model: 'gpt-3.5-turbo' } as unknown as AgentModelParameters,
+      },
+      deps,
+    );
+
+    expect(result?.artifacts).toBeUndefined();
+    expect(result?.tools).toEqual(
+      expect.arrayContaining(['file_search', 'create_spreadsheet', 'create_document']),
+    );
+  });
+
   test('should use parsed promptPrefix for ephemeral agent instructions', async () => {
     const { EPHEMERAL_AGENT_ID } = Constants;
 

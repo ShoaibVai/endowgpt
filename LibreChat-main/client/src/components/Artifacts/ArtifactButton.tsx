@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState, useResetRecoilState } from 'recoil';
 import type { Artifact } from '~/common';
 import ArtifactRow from '~/components/Chat/Messages/Content/Parts/ArtifactRow';
-import { artifactRowKind } from '~/utils/artifacts';
 import { logger, isArtifactRoute } from '~/utils';
 import store from '~/store';
 
@@ -66,13 +65,11 @@ const ArtifactButton = ({ artifact }: { artifact: Artifact | null }) => {
     }
   };
 
-  /* Model-authored artifacts have no file behind them — the panel's own
-   * `DownloadArtifact` serializes the (possibly edited) content, which
-   * needs the editor context this row doesn't sit in. */
+  /* Model-authored documents have no file behind them — the panel's own
+   * `DownloadArtifact` serializes the (possibly edited) content. */
   return (
     <ArtifactRow
       title={artifact.title ?? ''}
-      kind={artifactRowKind(artifact)}
       isSelected={isSelected}
       onOpen={handleOpen}
       artifactId={artifact.id}

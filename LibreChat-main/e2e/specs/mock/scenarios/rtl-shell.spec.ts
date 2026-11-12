@@ -22,7 +22,7 @@ import {
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
-const HTML_ARTIFACT = 'E2E HTML Artifact';
+const DOCUMENT_ARTIFACT = 'E2E Document Artifact';
 
 async function useArabic(page: Page, navVisible?: boolean) {
   await page.addInitScript((visible) => {
@@ -298,9 +298,9 @@ test.describe('desktop', () => {
     await openRtl(page, conversationPath);
 
     await messagesView(page)
-      .getByRole('button', { name: new RegExp(HTML_ARTIFACT) })
+      .getByRole('button', { name: new RegExp(DOCUMENT_ARTIFACT) })
       .click();
-    const panel = page.getByRole('region', { name: HTML_ARTIFACT });
+    const panel = page.getByRole('region', { name: DOCUMENT_ARTIFACT });
     await expect(panel).toBeVisible({ timeout: 30000 });
 
     await expectArtifactsHandleFollowsPointer(page, panel);
@@ -316,9 +316,9 @@ test.describe('desktop', () => {
     await sendMessageAndWaitForCompletion(page, 'E2E_HTML_ARTIFACT_REPLY', { timeout: 60000 });
     await expect(page).toHaveURL(/\/c\/(?!new)/);
     await messagesView(page)
-      .getByRole('button', { name: new RegExp(HTML_ARTIFACT) })
+      .getByRole('button', { name: new RegExp(DOCUMENT_ARTIFACT) })
       .click();
-    const panel = page.getByRole('region', { name: HTML_ARTIFACT });
+    const panel = page.getByRole('region', { name: DOCUMENT_ARTIFACT });
     await expect(panel).toBeVisible({ timeout: 30000 });
     await expect(page.locator('html')).not.toHaveAttribute('dir', 'rtl');
 

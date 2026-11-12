@@ -352,7 +352,6 @@ export function applyModelSpecEphemeralAgent({
     file_search: modelSpec.fileSearch ?? false,
     execute_code: modelSpec.executeCode ?? false,
     memory: modelSpec.memory ?? false,
-    artifacts: modelSpec.artifacts === true ? 'default' : modelSpec.artifacts || '',
   };
 
   // For existing conversations, layer per-conversation localStorage overrides
@@ -363,7 +362,6 @@ export function applyModelSpecEphemeralAgent({
       ['execute_code', LocalStorageKeys.LAST_CODE_TOGGLE_],
       ['web_search', LocalStorageKeys.LAST_WEB_SEARCH_TOGGLE_],
       ['file_search', LocalStorageKeys.LAST_FILE_SEARCH_TOGGLE_],
-      ['artifacts', LocalStorageKeys.LAST_ARTIFACTS_TOGGLE_],
       ['memory', LocalStorageKeys.LAST_MEMORY_TOGGLE_],
     ];
 

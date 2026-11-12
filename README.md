@@ -1,13 +1,15 @@
 # endowGPT
 
-endowGPT is a branded, self-hosted ChatGPT-style workspace with Artifacts, a
-Canvas-style document editor, and RAG over your own files. It is built on
+endowGPT is a branded, self-hosted ChatGPT-style workspace with a Canvas-style
+document editor, real generated files, and RAG over your own files. It is built on
 [LibreChat](LICENSES.md#librechat) and its RAG API, with a lean deployment layer on
 top: one compose file, one env file, and a curated model configuration.
 
-- **Products**: chat with two hosted models, sandboxed Artifacts (HTML/code and
-  documents), a full document editor with AI selection edits and version history,
-  and retrieval-augmented chat with citations.
+- **Products**: chat with the endowGPT Fast model (Flash when configured), a full
+  document editor with AI selection edits and version history, native `.docx` /
+  `.xlsx` / `.pptx` / `.md` file generation, and retrieval-augmented chat with
+  citations. The upstream HTML/React/code artifact system is intentionally removed;
+  old artifact conversations render as ordinary Markdown.
 - **Stack**: Docker Compose · MongoDB · Meilisearch · RAG API · pgvector · Ollama
   (local embeddings).
 
@@ -36,12 +38,12 @@ open http://localhost:3080    # register the first user (it becomes admin)
 
 `.env` needs, at minimum:
 
-| Variable | Notes |
-|---|---|
-| `OPENCODE_API_KEY` | credential for the OpenCode Go plan (`https://opencode.ai/inference/go/openai/v1`); stays out of git |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET` | generate (48–64 random chars) |
-| `CREDS_KEY`, `CREDS_IV` | exactly 64 / 32 hex chars |
-| `MEILI_MASTER_KEY`, `POSTGRES_PASSWORD` | generate |
+| Variable                                             | Notes                                                                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `OPENCODE_API_KEY`                                   | credential for the OpenCode Go plan (`https://opencode.ai/inference/go/openai/v1`); stays out of git |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET` | generate (48–64 random chars)                                                                        |
+| `CREDS_KEY`, `CREDS_IV`                              | exactly 64 / 32 hex chars                                                                            |
+| `MEILI_MASTER_KEY`, `POSTGRES_PASSWORD`              | generate                                                                                             |
 
 Everything generated once can stay untouched afterwards.
 
@@ -58,14 +60,14 @@ docker compose down -v         # stop and delete all data
 
 ## What the stack runs
 
-| Service | Purpose |
-|---|---|
-| `api` | endowGPT app (LibreChat server + built SPA) on `:3080` |
-| `mongodb` | users, conversations, messages, **documents** |
-| `meilisearch` | conversation search |
-| `rag_api` | file parsing, chunking, retrieval (`/health`, `/embed`, `/query`) |
-| `vectordb` | pgvector Postgres for embeddings |
-| `ollama` / `ollama-init` | local embeddings; init pulls `nomic-embed-text` once |
+| Service                  | Purpose                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| `api`                    | endowGPT app (LibreChat server + built SPA) on `:3080`            |
+| `mongodb`                | users, conversations, messages, **documents**                     |
+| `meilisearch`            | conversation search                                               |
+| `rag_api`                | file parsing, chunking, retrieval (`/health`, `/embed`, `/query`) |
+| `vectordb`               | pgvector Postgres for embeddings                                  |
+| `ollama` / `ollama-init` | local embeddings; init pulls `nomic-embed-text` once              |
 
 Only `api:3080` is exposed on the host.
 
@@ -78,21 +80,31 @@ Requests carry a stable `x-opencode-session` header (per user) and a client
 User-Agent, which Go requires for routing and prompt caching. One model spec in
 `LibreChat-main/librechat.yaml` gives the model its display name:
 
-| Label | Model | Notes |
-|---|---|---|
-| endowGPT Fast | `deepseek-v4.1-flash` | default for new chats, titles, and document edits; artifacts + file search |
+| Label         | Model                 | Notes                                                                                |
+| ------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| endowGPT Fast | `deepseek-v4.1-flash` | default for new chats, titles, and document edits; file search and native file tools |
 
 Streaming is always on; reasoning appears in a collapsible "Thinking" block;
 upstream auth/rate/availability errors are mapped to readable messages.
 
-### Documents and Artifacts
+### Documents and files
 
-Artifacts open in the right-hand panel with Preview/Code tabs, copy, download,
-fullscreen, and version back/forward. The `document` artifact type opens a TipTap
-editor with headings, lists, tables, links, code blocks, Markdown/DOCX/PDF export,
-autosave, inline AI selection edits with per-change accept/reject, and per-document
-version history with restore. Documents are stored in MongoDB per user +
-conversation + artifact id, and reopen from the originating conversation.
+The editable document opens in the right-hand panel (full-screen on phones) with
+copy, download, versions, and an obvious close. It is a TipTap editor with
+headings, lists, tables, links, code blocks, Markdown/DOCX/PDF export, autosave,
+inline AI selection edits with per-change accept/reject, and per-document version
+history with restore. Documents are stored in MongoDB per user + conversation +
+artifact id and reopen from the originating conversation.
+
+A request for a real file calls the native tools instead of the editor:
+`.docx`/`.md` → `create_document`, `.xlsx`/`.csv` → `create_spreadsheet`,
+`.pptx` → `create_presentation`. The chat shows a clean file card with preview and
+download. The model is instructed never to answer a file request with HTML, a
+website, or a download-link page.
+
+The old upstream artifact panel (HTML/React/SVG/Mermaid/code, Preview/Code tabs,
+Sandpack, Monaco, undocking) is gone. A legacy `:::artifact` message is unwrapped
+so its fenced content renders as ordinary Markdown; it never reopens a panel.
 
 ### Native file generation
 
@@ -182,12 +194,14 @@ the navigation entry.
 cd LibreChat-main
 npm run test:api -- --testPathPatterns documents      # documents API
 npm run test:client -- --testPathPatterns Document     # editor components
-node ../scripts/smoke.mjs                             # boot + both models
+node ../scripts/smoke.mjs                             # boot + model round-trip
+node ../scripts/smoke-files.mjs                       # real .md/.docx/.xlsx turn
 node ../scripts/bench-files.mjs                       # 1k-row xlsx + cached preview
 ```
 
 The model smoke test skips with a clear message when `OPENCODE_API_KEY` is unset;
-boot/UI checks still run.
+boot/UI checks still run. The file smoke needs `ENDOWGPT_SMOKE_EMAIL` and
+`ENDOWGPT_SMOKE_PASSWORD` (or an unexpired `ENDOWGPT_SMOKE_TOKEN`) and skips otherwise.
 
 ## Layout
 

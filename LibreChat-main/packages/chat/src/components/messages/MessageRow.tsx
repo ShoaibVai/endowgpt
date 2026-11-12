@@ -168,7 +168,7 @@ export default function MessageRow({
         )}
         {!hasParallelContent &&
           !isSystem &&
-          (!isCreatedByUser || showAuthor) &&
+          showAuthor &&
           renderAuthorHeader({
             icon,
             label,

@@ -1,8 +1,7 @@
 import React from 'react';
-import { getDefaultStore } from 'jotai';
 import { RecoilRoot, useRecoilValue } from 'recoil';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { undockedArtifacts } from './state';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { Artifact } from '~/common';
 import Artifacts from './Artifacts';
 import store from '~/store';
 
@@ -13,22 +12,20 @@ let mockPrefersReducedMotion = false;
 jest.mock('@librechat/client', () => ({
   ...jest.requireActual('@librechat/client'),
   useMediaQuery: (query: string) =>
-    query === '(prefers-reduced-motion: reduce)' ? mockPrefersReducedMotion : mockIsMobile,
+    query === '(prefers-reduced-motion: reduce)' ? mockPrefersReducedMotion : false,
 }));
 
-let mockCanUndock = true;
+jest.mock('~/hooks/useScaledMaxWidth', () => ({
+  __esModule: true,
+  default: () => mockIsMobile,
+}));
 
 jest.mock('~/Providers', () => ({
-  useMutationState: () => ({ isMutating: false }),
   useShareContext: () => ({ isSharedConvo: false }),
-  useArtifactsContext: () => ({ canUndock: mockCanUndock }),
 }));
 
 jest.mock('~/hooks', () => ({
-  useLocalize:
-    () =>
-    (key: string): string =>
-      key,
+  useLocalize: () => (key: string) => key,
   useFocusTrap: (
     containerRef: React.RefObject<HTMLElement | null>,
     active: boolean,
@@ -60,28 +57,43 @@ jest.mock('~/hooks/Artifacts/useArtifacts', () => ({
 
 jest.mock('./ArtifactTabs', () => ({
   __esModule: true,
-  default: () => <div data-testid="artifact-content" />,
+  default: ({ artifact }: { artifact: Artifact }) => (
+    <div data-testid="artifact-content">{artifact.title}</div>
+  ),
 }));
 
 jest.mock('./ArtifactVersion', () => ({
   __esModule: true,
-  default: () => null,
+  default: ({ totalVersions }: { totalVersions: number }) => (
+    <div data-testid="artifact-versions">{totalVersions}</div>
+  ),
 }));
 
 jest.mock('./DownloadArtifact', () => ({
   __esModule: true,
-  default: () => <div data-testid="download-artifact" />,
-}));
-
-jest.mock('./Mermaid/Export', () => ({
-  __esModule: true,
-  default: () => <div data-testid="mermaid-export" />,
+  default: () => <button type="button">download-artifact</button>,
 }));
 
 jest.mock('~/components/Messages/Content/CopyButton', () => ({
   __esModule: true,
-  default: () => null,
+  default: () => <button type="button">copy-artifact</button>,
 }));
+
+const documentArtifact: Artifact = {
+  id: 'document-1',
+  type: 'application/vnd.endowgpt.document',
+  title: 'Plan',
+  content: '# Plan',
+  lastUpdateTime: 2,
+};
+
+const olderArtifact: Artifact = {
+  id: 'document-0',
+  type: 'application/vnd.endowgpt.document',
+  title: 'Old plan',
+  content: '# Old plan',
+  lastUpdateTime: 1,
+};
 
 const ArtifactStateProbe = () => {
   const currentArtifactId = useRecoilValue(store.currentArtifactId);
@@ -95,176 +107,36 @@ const ArtifactStateProbe = () => {
   );
 };
 
-describe('Artifacts panel accessibility', () => {
+describe('Artifacts panel', () => {
   beforeEach(() => {
     mockIsMobile = false;
     mockPrefersReducedMotion = false;
-    mockCanUndock = true;
     mockUseArtifacts.mockReturnValue({
-      activeTab: 'code',
-      setActiveTab: jest.fn(),
-      currentIndex: 0,
-      currentArtifact: {
-        id: 'mermaid-artifact-1',
-        type: 'application/vnd.mermaid',
-        title: 'Diagram',
-        content: 'graph TD\nA-->B',
-        lastUpdateTime: 1,
-      },
-      orderedArtifactIds: ['mermaid-artifact-1'],
-      setCurrentArtifactId: jest.fn(),
-    });
-  });
-
-  it('hides the Sandpack refresh action for Mermaid previews', async () => {
-    mockUseArtifacts.mockReturnValue({
-      activeTab: 'preview',
-      setActiveTab: jest.fn(),
-      currentIndex: 0,
-      currentArtifact: {
-        id: 'mermaid-artifact-1',
-        type: 'application/vnd.mermaid',
-        title: 'Diagram',
-        content: 'graph TD\nA-->B',
-        lastUpdateTime: 1,
-      },
-      orderedArtifactIds: ['mermaid-artifact-1'],
-      setCurrentArtifactId: jest.fn(),
-    });
-
-    render(
-      <RecoilRoot>
-        <Artifacts />
-      </RecoilRoot>,
-    );
-
-    await screen.findByRole('region', { name: 'Diagram' });
-    expect(screen.queryByRole('button', { name: 'com_ui_refresh' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('mermaid-export')).toBeInTheDocument();
-    /* The export menu owns SVG, PNG and the source, so a second download
-     * control beside it would be a fourth, unlabelled way to save the same
-     * diagram. */
-    expect(screen.queryByTestId('download-artifact')).not.toBeInTheDocument();
-  });
-
-  it('opens a preview-capable artifact on its preview tab after a code-only one', async () => {
-    /* A code-only artifact forces the Code tab. That constraint used to be
-     * written back into the panel's shared `activeTab`, so the next HTML or
-     * diagram row opened on Code while announcing a rendered preview. */
-    const setActiveTab = jest.fn();
-    const codeOnly = {
-      activeTab: 'code',
-      setActiveTab,
-      currentIndex: 0,
-      currentArtifact: {
-        id: 'code-artifact-1',
-        type: 'application/vnd.code',
-        title: 'ingest.py',
-        content: 'print(1)',
-        lastUpdateTime: 1,
-      },
-      orderedArtifactIds: ['code-artifact-1', 'html-artifact-1'],
-      setCurrentArtifactId: jest.fn(),
-    };
-    mockUseArtifacts.mockReturnValue(codeOnly);
-
-    const { rerender } = render(
-      <RecoilRoot>
-        <Artifacts />
-      </RecoilRoot>,
-    );
-    await screen.findByRole('region', { name: 'ingest.py' });
-    /* Nothing to reset while the constrained artifact is the open one. */
-    expect(setActiveTab).not.toHaveBeenCalledWith('preview');
-
-    mockUseArtifacts.mockReturnValue({
-      ...codeOnly,
       currentIndex: 1,
-      currentArtifact: {
-        id: 'html-artifact-1',
-        type: 'text/html',
-        title: 'dashboard.html',
-        content: '<h1>hi</h1>',
-        lastUpdateTime: 2,
-      },
-    });
-    rerender(
-      <RecoilRoot>
-        <Artifacts />
-      </RecoilRoot>,
-    );
-
-    await waitFor(() => expect(setActiveTab).toHaveBeenCalledWith('preview'));
-  });
-
-  it('keeps the Mermaid export action on the code tab', async () => {
-    render(
-      <RecoilRoot>
-        <Artifacts />
-      </RecoilRoot>,
-    );
-
-    await screen.findByRole('region', { name: 'Diagram' });
-    /* Saving the source never needed a rendered preview, and a download
-     * control that disappears when the user switches tabs reads as a bug. */
-    expect(screen.getByTestId('mermaid-export')).toBeInTheDocument();
-    expect(screen.queryByTestId('download-artifact')).not.toBeInTheDocument();
-  });
-
-  it('keeps the generic download control for non-Mermaid artifacts', async () => {
-    mockUseArtifacts.mockReturnValue({
-      activeTab: 'preview',
-      setActiveTab: jest.fn(),
-      currentIndex: 0,
-      currentArtifact: {
-        id: 'html-artifact-1',
-        type: 'text/html',
-        title: 'Page',
-        content: '<h1>Hi</h1>',
-        lastUpdateTime: 1,
-      },
-      orderedArtifactIds: ['html-artifact-1'],
+      currentArtifact: documentArtifact,
+      orderedArtifactIds: [olderArtifact.id, documentArtifact.id],
       setCurrentArtifactId: jest.fn(),
     });
+  });
 
+  it('renders a document with its title, actions and editor', async () => {
     render(
       <RecoilRoot>
         <Artifacts />
       </RecoilRoot>,
     );
 
-    await screen.findByRole('region', { name: 'Page' });
-    expect(screen.getByTestId('download-artifact')).toBeInTheDocument();
-    expect(screen.queryByTestId('mermaid-export')).not.toBeInTheDocument();
+    const region = await screen.findByRole('region', { name: 'Plan' });
+    expect(region).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Plan' })).toBeInTheDocument();
+    expect(screen.getByTestId('artifact-versions')).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: 'copy-artifact' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'download-artifact' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'com_ui_close' })).toBeInTheDocument();
+    expect(screen.getByTestId('artifact-content')).toHaveTextContent('Plan');
   });
 
-  it('keeps the refresh action for sandboxed previews', async () => {
-    mockUseArtifacts.mockReturnValue({
-      activeTab: 'preview',
-      setActiveTab: jest.fn(),
-      currentIndex: 0,
-      currentArtifact: {
-        id: 'html-artifact-1',
-        type: 'text/html',
-        title: 'Page',
-        content: '<h1>Hi</h1>',
-        lastUpdateTime: 1,
-      },
-      orderedArtifactIds: ['html-artifact-1'],
-      setCurrentArtifactId: jest.fn(),
-    });
-
-    render(
-      <RecoilRoot>
-        <Artifacts />
-      </RecoilRoot>,
-    );
-
-    await screen.findByRole('region', { name: 'Page' });
-    expect(screen.getByRole('button', { name: 'com_ui_refresh' })).toBeInTheDocument();
-  });
-
-  it('keeps the resizable layout ID distinct from the controlled Artifact region', async () => {
+  it('keeps the panel id distinct from the content area', async () => {
     const { container } = render(
       <RecoilRoot>
         <div id="artifacts-panel">
@@ -273,55 +145,21 @@ describe('Artifacts panel accessibility', () => {
       </RecoilRoot>,
     );
 
-    await screen.findByRole('region', { name: 'Diagram' });
-
-    expect(container.querySelectorAll('#artifacts-panel')).toHaveLength(1);
+    await screen.findByRole('region', { name: 'Plan' });
     expect(container.querySelectorAll('#artifact-viewer')).toHaveLength(1);
   });
 
-  it('supports keyboard resizing and restores focus after the mobile sheet closes', async () => {
+  it('opens as a full-screen dialog on mobile and restores focus when closed', async () => {
     mockIsMobile = true;
     const opener = document.createElement('button');
-    opener.textContent = 'Open artifact';
-    document.body.appendChild(opener);
-    opener.focus();
-
-    render(
-      <RecoilRoot>
-        <Artifacts />
-      </RecoilRoot>,
-    );
-
-    const dialog = await screen.findByRole('dialog', { name: 'Diagram' });
-    const separator = screen.getByRole('separator', { name: 'com_ui_resize_artifact_panel' });
-    await waitFor(() => expect(separator).toHaveFocus());
-
-    fireEvent.keyDown(separator, { key: 'ArrowDown' });
-    expect(separator).toHaveAttribute('aria-valuenow', '80');
-    expect(dialog).toHaveStyle({ height: '80vh' });
-
-    fireEvent.keyDown(separator, { key: 'Home' });
-    expect(separator).toHaveAttribute('aria-valuenow', '10');
-    expect(dialog).toHaveStyle({ height: '10vh' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'com_ui_close' }));
-    expect(opener).not.toHaveFocus();
-    await waitFor(() => expect(opener).toHaveFocus());
-
-    opener.remove();
-  });
-
-  it('closes without the animation delay when reduced motion is preferred', async () => {
-    mockIsMobile = true;
-    mockPrefersReducedMotion = true;
-    const opener = document.createElement('button');
+    opener.textContent = 'Open document';
     document.body.appendChild(opener);
     opener.focus();
 
     render(
       <RecoilRoot
         initializeState={({ set }) => {
-          set(store.currentArtifactId, 'mermaid-artifact-1');
+          set(store.currentArtifactId, documentArtifact.id);
           set(store.artifactsVisibility, true);
         }}
       >
@@ -330,139 +168,77 @@ describe('Artifacts panel accessibility', () => {
       </RecoilRoot>,
     );
 
-    const separator = await screen.findByRole('separator', {
-      name: 'com_ui_resize_artifact_panel',
-    });
-    await waitFor(() => expect(separator).toHaveFocus());
+    const dialog = await screen.findByRole('dialog', { name: 'Plan' });
+    expect(dialog).toHaveClass('fixed', 'inset-0');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'copy-artifact' })).toHaveFocus(),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'com_ui_close' }));
 
-    expect(screen.getByTestId('artifact-state')).toHaveAttribute('data-current-id', '');
+    await waitFor(() =>
+      expect(screen.getByTestId('artifact-state')).toHaveAttribute('data-current-id', ''),
+    );
     expect(screen.getByTestId('artifact-state')).toHaveAttribute('data-visible', 'false');
     await waitFor(() => expect(opener).toHaveFocus());
 
     opener.remove();
   });
 
-  describe('undocking', () => {
-    const jotaiStore = getDefaultStore();
-    let openSpy: jest.SpyInstance<Window | null>;
+  it('closes immediately when reduced motion is preferred', async () => {
+    mockIsMobile = true;
+    mockPrefersReducedMotion = true;
 
-    beforeEach(() => {
-      act(() => jotaiStore.set(undockedArtifacts, null));
-      openSpy = jest.spyOn(window, 'open');
+    render(
+      <RecoilRoot
+        initializeState={({ set }) => {
+          set(store.currentArtifactId, documentArtifact.id);
+          set(store.artifactsVisibility, true);
+        }}
+      >
+        <ArtifactStateProbe />
+        <Artifacts />
+      </RecoilRoot>,
+    );
+
+    await screen.findByRole('dialog', { name: 'Plan' });
+    fireEvent.click(screen.getByRole('button', { name: 'com_ui_close' }));
+
+    expect(screen.getByTestId('artifact-state')).toHaveAttribute('data-current-id', '');
+    expect(screen.getByTestId('artifact-state')).toHaveAttribute('data-visible', 'false');
+  });
+
+  it('hides the document copy action for generated files', async () => {
+    mockUseArtifacts.mockReturnValue({
+      currentIndex: 0,
+      currentArtifact: {
+        id: 'tool-artifact-file-1',
+        type: 'application/vnd.librechat.spreadsheet-preview',
+        title: 'data.xlsx',
+        content: '',
+        lastUpdateTime: 1,
+        download: {
+          filename: 'data.xlsx',
+          generatedFile: {
+            version: 1,
+            tool: 'write_file',
+            kind: 'spreadsheet',
+            format: 'xlsx',
+          },
+        },
+      },
+      orderedArtifactIds: ['tool-artifact-file-1'],
+      setCurrentArtifactId: jest.fn(),
     });
 
-    afterEach(() => {
-      openSpy.mockRestore();
-      act(() => jotaiStore.set(undockedArtifacts, null));
-    });
+    render(
+      <RecoilRoot>
+        <Artifacts />
+      </RecoilRoot>,
+    );
 
-    it('opens a window from the click and offers to dock back', async () => {
-      const detached = {
-        focus: jest.fn(),
-        closed: false,
-        document: document.implementation.createHTMLDocument(''),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        close: jest.fn(),
-      } as unknown as Window;
-      openSpy.mockReturnValue(detached);
-
-      render(
-        <RecoilRoot>
-          <Artifacts />
-        </RecoilRoot>,
-      );
-
-      fireEvent.click(await screen.findByRole('button', { name: 'com_ui_undock_artifacts' }));
-
-      expect(openSpy).toHaveBeenCalledWith(
-        '',
-        expect.stringContaining('librechat-artifacts'),
-        expect.any(String),
-      );
-      expect(jotaiStore.get(undockedArtifacts)?.window).toBe(detached);
-      expect(
-        await screen.findByRole('button', { name: 'com_ui_dock_artifacts' }),
-      ).toBeInTheDocument();
-    });
-
-    /* A blocked popup must leave the pane where it is, not hide it in a window
-     * that never opened. */
-    it('stays docked when the browser blocks the window', async () => {
-      openSpy.mockReturnValue(null);
-
-      render(
-        <RecoilRoot>
-          <Artifacts />
-        </RecoilRoot>,
-      );
-
-      fireEvent.click(await screen.findByRole('button', { name: 'com_ui_undock_artifacts' }));
-
-      expect(jotaiStore.get(undockedArtifacts)).toBeNull();
-      expect(screen.getByRole('button', { name: 'com_ui_undock_artifacts' })).toBeInTheDocument();
-    });
-
-    it('has no undock action on the mobile sheet', async () => {
-      mockIsMobile = true;
-
-      render(
-        <RecoilRoot>
-          <Artifacts />
-        </RecoilRoot>,
-      );
-
-      await screen.findByRole('dialog', { name: 'Diagram' });
-      expect(
-        screen.queryByRole('button', { name: 'com_ui_undock_artifacts' }),
-      ).not.toBeInTheDocument();
-    });
-
-    it('offers no undock action where the deployment turned it off', async () => {
-      mockCanUndock = false;
-
-      render(
-        <RecoilRoot>
-          <Artifacts />
-        </RecoilRoot>,
-      );
-
-      await screen.findByTestId('artifact-content');
-      expect(
-        screen.queryByRole('button', { name: 'com_ui_undock_artifacts' }),
-      ).not.toBeInTheDocument();
-    });
-
-    /* Losing the capability while the pane is out there must not strand it in
-     * a window with no way back. */
-    it('keeps the dock action when the capability goes away while undocked', async () => {
-      const detached = {
-        focus: jest.fn(),
-        closed: false,
-        document: document.implementation.createHTMLDocument(''),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        close: jest.fn(),
-      } as unknown as Window;
-      act(() =>
-        jotaiStore.set(undockedArtifacts, {
-          window: detached,
-          root: document.createElement('div'),
-        }),
-      );
-      mockCanUndock = false;
-
-      render(
-        <RecoilRoot>
-          <Artifacts />
-        </RecoilRoot>,
-      );
-
-      expect(
-        await screen.findByRole('button', { name: 'com_ui_dock_artifacts' }),
-      ).toBeInTheDocument();
-    });
+    await screen.findByRole('region', { name: 'data.xlsx' });
+    expect(screen.queryByRole('button', { name: 'copy-artifact' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'download-artifact' })).toBeInTheDocument();
   });
 });

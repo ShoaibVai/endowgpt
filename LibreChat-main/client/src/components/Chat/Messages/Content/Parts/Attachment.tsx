@@ -21,9 +21,8 @@ import {
   renderAttachmentKey,
 } from './attachmentTypes';
 import { useLocalize, useAttachmentPreviewSync, useExpandCollapse } from '~/hooks';
-import { fileToArtifact, TOOL_ARTIFACT_TYPES } from '~/utils/artifacts';
 import Image from '~/components/Chat/Messages/Content/Image';
-import ToolMermaidArtifact from './ToolMermaidArtifact';
+import { fileToArtifact } from '~/utils/artifacts';
 import ToolArtifactCard from './ToolArtifactCard';
 import { useAttachmentLink } from './LogLink';
 import { cn } from '~/utils';
@@ -460,15 +459,6 @@ const PanelArtifact = memo(({ attachment, type }: PanelArtifactProps) => {
 });
 PanelArtifact.displayName = 'PanelArtifact';
 
-const MermaidArtifact = memo(({ attachment }: { attachment: TAttachment }) => {
-  const file = attachment as TFile & TAttachmentMetadata;
-  if (!file.text) {
-    return null;
-  }
-  return <ToolMermaidArtifact attachment={attachment} text={file.text} />;
-});
-MermaidArtifact.displayName = 'MermaidArtifact';
-
 export default function Attachment({ attachment }: { attachment?: TAttachment }) {
   if (!attachment) {
     return null;
@@ -490,9 +480,6 @@ export default function Attachment({ attachment }: { attachment?: TAttachment })
   // `PanelArtifact` -> `fileToArtifact` so the panel path doesn't
   // re-run `detectArtifactTypeFromFile` a second time.
   const artType = artifactTypeForAttachment(attachment);
-  if (artType === TOOL_ARTIFACT_TYPES.MERMAID) {
-    return <MermaidArtifact attachment={attachment} />;
-  }
   if (artType != null) {
     return <PanelArtifact attachment={attachment} type={artType} />;
   }
@@ -518,7 +505,6 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
    * FileAttachment (PreviewPlaceholderRow); on resolution it switches
    * to PanelArtifact in place. */
   const panelRow: Array<{ attachment: TAttachment; type: ToolArtifactType | null }> = [];
-  const mermaidArtifacts: TAttachment[] = [];
 
   attachments.forEach((attachment) => {
     if (attachment.type === Tools.web_search) {
@@ -536,10 +522,6 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
       return;
     }
     const artType = artifactTypeForAttachment(attachment);
-    if (artType === TOOL_ARTIFACT_TYPES.MERMAID) {
-      mermaidArtifacts.push(attachment);
-      return;
-    }
     if (artType != null) {
       panelRow.push({ attachment, type: artType });
       return;
@@ -561,7 +543,6 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
    * does not change — so a row keeps its slot across the loading-to-ready
    * transition instead of jumping once the preview lands. */
   const orderedPanel = [...panelRow].sort(byEntrySalience);
-  mermaidArtifacts.sort(bySalience);
   imageAttachments.sort(bySalience);
 
   const downloadableFileAttachments = fileAttachments.filter((attachment) =>
@@ -605,16 +586,6 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
               />
             );
           })}
-        </div>
-      )}
-      {mermaidArtifacts.length > 0 && (
-        <div className="my-2 flex flex-col gap-3">
-          {mermaidArtifacts.map((attachment, index) => (
-            <MermaidArtifact
-              attachment={attachment}
-              key={renderAttachmentKey('mermaid', attachment, index)}
-            />
-          ))}
         </div>
       )}
       {visibleTextAttachments.length > 0 && (

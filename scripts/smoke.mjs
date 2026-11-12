@@ -6,7 +6,8 @@
  *
  * Checks, in order:
  *   1. API health (`/health`) and startup config (`/api/config`): appTitle,
- *      modelSpecs carry the two endowGPT models, artifacts + fileSearch on.
+ *      modelSpecs carry the endowGPT models with fileSearch on and no legacy
+ *      artifact capability.
  *   2. The shell (`/`) serves the endowGPT brand: title, favicons, no LibreChat
  *      title anywhere visible.
  *   3. `/api/documents` is mounted and requires auth (401 when anonymous).
@@ -88,8 +89,8 @@ async function main() {
     );
     step(
       'spec capabilities',
-      deepseek?.artifacts === true && deepseek?.fileSearch === true ? 'pass' : 'fail',
-      'artifacts + fileSearch on the model spec',
+      deepseek?.artifacts !== true && deepseek?.fileSearch === true ? 'pass' : 'fail',
+      'no artifacts flag + fileSearch on the model spec',
     );
     step(
       'default model',

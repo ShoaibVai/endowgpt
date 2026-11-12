@@ -293,9 +293,6 @@ export default defineConfig(({ command }) => ({
                     return 'mermaid';
                   }
 
-                  if (normalizedId.includes('@codesandbox/sandpack')) {
-                    return 'sandpack';
-                  }
                   /* DOCX rendering and its zip reader are only reachable from the
                    * lazy docx viewer. */
                   if (
@@ -372,12 +369,6 @@ export default defineConfig(({ command }) => ({
                     normalizedId.includes('rehype-')
                   ) {
                     return 'markdown-processing';
-                  }
-                  if (
-                    normalizedId.includes('monaco-editor') ||
-                    normalizedId.includes('@monaco-editor')
-                  ) {
-                    return 'code-editor';
                   }
                   if (
                     normalizedId.includes('react-window') ||

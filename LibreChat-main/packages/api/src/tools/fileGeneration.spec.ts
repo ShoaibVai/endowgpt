@@ -110,6 +110,40 @@ describe('file generation tools', () => {
     );
   });
 
+  it('creates several files from one request, one call per file', async () => {
+    const persist = jest.fn(async (file) => fakeFile(file.filename, file.mimeType));
+    const spreadsheet = createSpreadsheetTool({ limits, persist });
+    const document = createDocumentTool({ limits, persist });
+    const invoke = (tool: typeof document, args: object) =>
+      tool.invoke(args, { toolCall: { id: `call-${tool.name}`, name: tool.name, args } } as never);
+
+    await invoke(document, {
+      filename: 'students.md',
+      blocks: [{ type: 'heading', text: 'Students' }],
+    });
+    await invoke(document, {
+      filename: 'students.docx',
+      blocks: [{ type: 'paragraph', text: 'Student information' }],
+    });
+    await invoke(spreadsheet, {
+      filename: 'students.xlsx',
+      sheets: [
+        {
+          name: 'Students',
+          columns: [{ header: 'Name' }, { header: 'Grade' }],
+          rows: [['Ada', 95]],
+        },
+      ],
+    });
+
+    expect(persist).toHaveBeenCalledTimes(3);
+    expect(persist.mock.calls.map(([file]) => file.filename)).toEqual([
+      'students.md',
+      'students.docx',
+      'students.xlsx',
+    ]);
+  });
+
   it('turns an over-limit spreadsheet into a model-readable error without persisting', async () => {
     const persist = jest.fn(async (file) => fakeFile(file.filename, file.mimeType));
     const tool = createSpreadsheetTool({ limits, persist });

@@ -194,8 +194,8 @@ describe('PendingSteers', () => {
         'w-full',
         'px-4',
         'sm:px-2',
-        'md:max-w-3xl',
-        'xl:max-w-4xl',
+        'md:max-w-[43.75rem]',
+        'xl:max-w-[47.5rem]',
       );
     },
   );
@@ -205,7 +205,7 @@ describe('PendingSteers', () => {
 
     const list = screen.getByTestId('pending-steers');
     expect(list).toHaveClass('mx-auto', 'w-full', 'max-w-full', 'px-4', 'sm:px-2');
-    expect(list).not.toHaveClass('md:max-w-3xl', 'xl:max-w-4xl');
+    expect(list).not.toHaveClass('md:max-w-[43.75rem]', 'xl:max-w-[47.5rem]');
   });
 
   it('offers retry and send-as-new on failure', () => {

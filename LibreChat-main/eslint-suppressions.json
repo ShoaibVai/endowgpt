@@ -27,11 +27,6 @@
       "count": 6
     }
   },
-  "client/src/components/Artifacts/ArtifactCodeEditor.tsx": {
-    "shadcn/no-inline-styles": {
-      "count": 1
-    }
-  },
   "client/src/components/Artifacts/Artifacts.tsx": {
     "shadcn/no-arbitrary-values": {
       "count": 2

@@ -82,8 +82,6 @@ afterEach(() => {
   delete process.env.APP_TITLE;
   delete process.env.CHECK_BALANCE;
   delete process.env.START_BALANCE;
-  delete process.env.SANDPACK_BUNDLER_URL;
-  delete process.env.SANDPACK_STATIC_BUNDLER_URL;
   delete process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES;
   delete process.env.ALLOW_REGISTRATION;
   delete process.env.ALLOW_SOCIAL_LOGIN;
@@ -247,8 +245,6 @@ describe('GET /api/config', () => {
       expect(response.body).not.toHaveProperty('modelSpecs');
       expect(response.body).not.toHaveProperty('balance');
       expect(response.body).not.toHaveProperty('webSearch');
-      expect(response.body).not.toHaveProperty('bundlerURL');
-      expect(response.body).not.toHaveProperty('staticBundlerURL');
       expect(response.body).not.toHaveProperty('sharePointFilePickerEnabled');
       expect(response.body).not.toHaveProperty('sharePointBaseUrl');
       expect(response.body).not.toHaveProperty('sharePointPickerGraphScope');
@@ -287,8 +283,6 @@ describe('GET /api/config', () => {
       process.env.ANALYTICS_GTM_ID = 'GTM-XYZ';
       process.env.CUSTOM_FOOTER = 'public footer text';
       process.env.HELP_AND_FAQ_URL = 'https://internal.example.com/faq';
-      process.env.SANDPACK_BUNDLER_URL = 'https://bundler.test';
-      process.env.SANDPACK_STATIC_BUNDLER_URL = 'https://static-bundler.test';
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
       const app = createApp(null);
 
@@ -297,8 +291,6 @@ describe('GET /api/config', () => {
       expect(response.statusCode).toBe(200);
       expect(response.body).not.toHaveProperty('analyticsGtmId');
       expect(response.body).not.toHaveProperty('customFooter');
-      expect(response.body).not.toHaveProperty('bundlerURL');
-      expect(response.body).not.toHaveProperty('staticBundlerURL');
       expect(response.body).not.toHaveProperty('helpAndFaqURL');
       expect(response.body).not.toHaveProperty('allowAccountDeletion');
       expect(response.body).not.toHaveProperty('allowEmailChange');
@@ -743,15 +735,11 @@ describe('GET /api/config', () => {
 
     it('should include authenticated-only env var fields', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);
-      process.env.SANDPACK_BUNDLER_URL = 'https://bundler.test';
-      process.env.SANDPACK_STATIC_BUNDLER_URL = 'https://static-bundler.test';
       process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES = '5000000';
       const app = createApp(mockUser);
 
       const response = await request(app).get('/api/config');
 
-      expect(response.body.bundlerURL).toBe('https://bundler.test');
-      expect(response.body.staticBundlerURL).toBe('https://static-bundler.test');
       expect(response.body.conversationImportMaxFileSize).toBe(5000000);
     });
 

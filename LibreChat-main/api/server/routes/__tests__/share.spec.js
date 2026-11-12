@@ -325,7 +325,6 @@ describe('share routes', () => {
     });
     mockBuildSharedLinkStartupPayload.mockReturnValue({
       appTitle: 'Shared Chat',
-      bundlerURL: 'https://bundler.example.com',
       interface: {
         privacyPolicy: { externalUrl: 'https://example.com/privacy' },
       },
@@ -355,7 +354,6 @@ describe('share routes', () => {
     });
     expect(response.body).toEqual({
       appTitle: 'Shared Chat',
-      bundlerURL: 'https://bundler.example.com',
       interface: {
         privacyPolicy: { externalUrl: 'https://example.com/privacy' },
       },

@@ -22,7 +22,6 @@ const createModelSpec = (overrides: Partial<TModelSpec> = {}): TModelSpec =>
     webSearch: true,
     executeCode: true,
     fileSearch: false,
-    artifacts: true,
     ...overrides,
   }) as TModelSpec;
 
@@ -50,7 +49,6 @@ describe('applyModelSpecEphemeralAgent', () => {
         executeCode: true,
         webSearch: false,
         fileSearch: true,
-        artifacts: true,
       });
 
       applyModelSpecEphemeralAgent({
@@ -65,7 +63,6 @@ describe('applyModelSpecEphemeralAgent', () => {
         web_search: false,
         file_search: true,
         memory: false,
-        artifacts: 'default',
       });
     });
 
@@ -112,24 +109,6 @@ describe('applyModelSpecEphemeralAgent', () => {
       const disabled = createModelSpec({ memory: false });
       applyModelSpecEphemeralAgent({ convoId: null, modelSpec: disabled, updateEphemeralAgent });
       expect((updateEphemeralAgent.mock.calls[0][1] as TEphemeralAgent).memory).toBe(false);
-    });
-
-    it('should map artifacts: true to "default" string', () => {
-      const modelSpec = createModelSpec({ artifacts: true });
-
-      applyModelSpecEphemeralAgent({ convoId: null, modelSpec, updateEphemeralAgent });
-
-      const agent = updateEphemeralAgent.mock.calls[0][1] as TEphemeralAgent;
-      expect(agent.artifacts).toBe('default');
-    });
-
-    it('should pass through artifacts string value directly', () => {
-      const modelSpec = createModelSpec({ artifacts: 'custom-renderer' as any });
-
-      applyModelSpecEphemeralAgent({ convoId: null, modelSpec, updateEphemeralAgent });
-
-      const agent = updateEphemeralAgent.mock.calls[0][1] as TEphemeralAgent;
-      expect(agent.artifacts).toBe('custom-renderer');
     });
 
     it('should not copy model spec subagents into client ephemeral agent state', () => {
@@ -195,14 +174,14 @@ describe('applyModelSpecEphemeralAgent', () => {
     });
 
     it('should only override keys that exist in localStorage, leaving the rest as spec defaults', () => {
-      // User only changed artifacts, nothing else
-      writeToolToggle(LocalStorageKeys.LAST_ARTIFACTS_TOGGLE_, convoId, '');
+      // User only changed memory, nothing else
+      writeToolToggle(LocalStorageKeys.LAST_MEMORY_TOGGLE_, convoId, true);
 
       const modelSpec = createModelSpec({
         executeCode: true,
         webSearch: true,
         fileSearch: false,
-        artifacts: true,
+        memory: false,
         mcpServers: ['server1'],
       });
 
@@ -212,7 +191,7 @@ describe('applyModelSpecEphemeralAgent', () => {
       expect(agent.execute_code).toBe(true); // spec default (not in localStorage)
       expect(agent.web_search).toBe(true); // spec default
       expect(agent.file_search).toBe(false); // spec default
-      expect(agent.artifacts).toBe(''); // user override
+      expect(agent.memory).toBe(true); // user override
       expect(agent.mcp).toEqual(['server1']); // spec default (not in localStorage)
     });
   });
@@ -229,7 +208,6 @@ describe('applyModelSpecEphemeralAgent', () => {
         executeCode: true,
         webSearch: false,
         fileSearch: true,
-        artifacts: true,
         mcpServers: ['server1', 'server2'],
       });
 
@@ -241,7 +219,6 @@ describe('applyModelSpecEphemeralAgent', () => {
         web_search: false,
         file_search: true,
         memory: false,
-        artifacts: 'default',
       });
     });
 

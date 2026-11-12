@@ -164,16 +164,12 @@ describe('buildSharedLinkStartupPayload', () => {
         ANALYTICS_GTM_ID: 'GTM-XYZ',
         APP_TITLE: 'Test Chat',
         CUSTOM_FOOTER: 'Shared footer',
-        SANDPACK_BUNDLER_URL: 'https://bundler.example.com',
-        SANDPACK_STATIC_BUNDLER_URL: 'https://static-bundler.example.com',
       },
     );
 
     expect(payload).toEqual({
       appTitle: 'Test Chat',
       analyticsGtmId: 'GTM-XYZ',
-      bundlerURL: 'https://bundler.example.com',
-      staticBundlerURL: 'https://static-bundler.example.com',
       customFooter: 'Shared footer',
       interface: {
         privacyPolicy: { externalUrl: 'https://example.com/privacy' },

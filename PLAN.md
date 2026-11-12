@@ -1,9 +1,15 @@
 # endowGPT — Build Plan
 
 A branded, self-hosted ChatGPT-style workspace built on LibreChat (v0.8.9-rc1) with a
-RAG API. The product adds first-class **Artifacts** (including a live document type) and a
-**Canvas-style document editor** with AI-assisted targeted edits, diff review, and version
-history.
+RAG API. The product keeps two document surfaces: a **live document editor** with
+AI-assisted targeted edits, diff review, and version history, and **native generated
+files** (`.docx`, `.xlsx`, `.csv`, `.md`, `.pptx`).
+
+> **M9 supersedes the stock Artifact system.** The upstream HTML/React/SVG/Mermaid/code
+> artifact prompt, Sandpack/Monaco panel modes, undocking, and Preview/Code tabs were
+> intentionally removed. Requests for real files call `create_document`,
+> `create_spreadsheet`, or `create_presentation`; legacy artifact messages render as
+> ordinary Markdown. See `CHANGES.md` → "Documents-only simplification (M9)".
 
 This document is the design of record. `CHANGES.md` tracks every upstream file touched,
 `README.md` covers running the stack, and `REPORT.md` closes out the work.
@@ -14,18 +20,19 @@ This document is the design of record. `CHANGES.md` tracks every upstream file t
 
 ### Goals
 
-| # | Goal |
-|---|------|
-| G1 | `docker compose up -d` from the repo root brings up the whole product. |
-| G2 | Two custom OpenAI-compatible models, branded, streaming, with reasoning display and clear errors. |
-| G3 | Full endowGPT branding: no LibreChat user-visible strings, icons, titles, or metadata. Upstream license notices preserved. |
-| G4 | Animated logo splash on first load per session, accessible and skippable. |
-| G5 | Artifacts side panel with Preview/Code, copy, download, fullscreen, sandboxing, and version back/forward; enabled for both models. |
-| G6 | TipTap document editor inside Artifacts: rich formatting, Markdown import/export, AI selection edits, inline diff accept/reject, version history, autosave, rename, export to MD/DOCX/PDF, copy rich text, DB persistence, reopen from chat. |
-| G7 | RAG over PDF/DOCX/TXT/MD with citations and "edit this document". |
-| G8 | Email/password auth, env-controlled registration, first user is admin, no secrets in git. |
-| G9 | Upstream-merge friendliness: new code in named modules, minimal core edits, all core edits listed. |
-| G10 | Tests for document diff/edit/version restore plus a boot + two-model smoke test. |
+| #   | Goal                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | `docker compose up -d` from the repo root brings up the whole product.                                                                                                                                                                       |
+| G2  | One or two custom OpenAI-compatible models (endowGPT Fast, plus Flash when configured), branded, streaming, with reasoning display and clear errors.                                                                                         |
+| G3  | Full endowGPT branding: no LibreChat user-visible strings, icons, titles, or metadata. Upstream license notices preserved.                                                                                                                   |
+| G4  | Animated logo splash on first load per session, accessible and skippable.                                                                                                                                                                    |
+| G5  | A calm, documents-only side panel: document editor, generated-file preview, copy, download, versions, and an obvious close. No sandbox, code tabs, fullscreen viewer, or undocking.                                                          |
+| G6  | TipTap document editor inside the panel: rich formatting, Markdown import/export, AI selection edits, inline diff accept/reject, version history, autosave, rename, export to MD/DOCX/PDF, copy rich text, DB persistence, reopen from chat. |
+| G6b | Native file generation in normal chat: one tool call per file, real `.docx`/`.xlsx`/`.csv`/`.md`/`.pptx` cards with preview and download, and a firm prompt that forbids HTML/download-page answers.                                         |
+| G7  | RAG over PDF/DOCX/TXT/MD with citations and "edit this document".                                                                                                                                                                            |
+| G8  | Email/password auth, env-controlled registration, first user is admin, no secrets in git.                                                                                                                                                    |
+| G9  | Upstream-merge friendliness: new code in named modules, minimal core edits, all core edits listed.                                                                                                                                           |
+| G10 | Tests for document diff/edit/version restore, native file generation, plus a boot + model smoke test.                                                                                                                                        |
 
 ### Non-goals
 
@@ -109,15 +116,15 @@ endowGPT/
 
 Services in root `docker-compose.yml`:
 
-| Service | Image / build | Purpose |
-|---|---|---|
-| `api` | build `./LibreChat-main` | LibreChat server + built SPA |
-| `mongodb` | `mongo:7` | users, conversations, messages, documents |
-| `meilisearch` | `getmeili/meilisearch:v1.12` | conversation search |
-| `rag_api` | build `./rag-api-main` | file ingestion + retrieval |
-| `vectordb` | `pgvector/pgvector:pg16` | embeddings store |
-| `ollama` | `ollama/ollama:latest` | local embeddings |
-| `ollama-init` | `ollama/ollama:latest` | one-shot `pull nomic-embed-text` |
+| Service       | Image / build                | Purpose                                   |
+| ------------- | ---------------------------- | ----------------------------------------- |
+| `api`         | build `./LibreChat-main`     | LibreChat server + built SPA              |
+| `mongodb`     | `mongo:7`                    | users, conversations, messages, documents |
+| `meilisearch` | `getmeili/meilisearch:v1.12` | conversation search                       |
+| `rag_api`     | build `./rag-api-main`       | file ingestion + retrieval                |
+| `vectordb`    | `pgvector/pgvector:pg16`     | embeddings store                          |
+| `ollama`      | `ollama/ollama:latest`       | local embeddings                          |
+| `ollama-init` | `ollama/ollama:latest`       | one-shot `pull nomic-embed-text`          |
 
 All state is in named volumes. Only `api` publishes a host port. `rag_api` and
 `vectordb` stay on the internal network. A single `.env` at the root feeds compose and is
@@ -150,14 +157,15 @@ endpoints:
 
 Per-model specs provide the labels the endpoint cannot:
 
-| Spec `name` | `label` (UI) | Capabilities |
-|---|---|---|
-| `deepseek-v4.1-flash` | endowGPT Fast | `default: true`, `artifacts: true`, `fileSearch: true`, `showOnLanding: true`, reasoning |
+| Spec `name`           | `label` (UI)  | Capabilities                                                                             |
+| --------------------- | ------------- | ---------------------------------------------------------------------------------------- |
+| `deepseek-v4.1-flash` | endowGPT Fast | `default: true`, `fileSearch: true`, `showOnLanding: true`, reasoning, native file tools |
 
 - API key comes only from `OPENCODE_API_KEY`; it is never written into YAML or code.
 - `titleModel` uses the same model, so titles never need a second upstream model.
 - `fileSearch: true` makes LibreChat create an ephemeral agent per conversation for custom
-  endpoints, which is what enables RAG tools *and* artifact prompting.
+  endpoints, which is what enables RAG tools. Native file-generation tools are added to
+  every ephemeral chat independently of any model-spec flag.
 - Streaming stays on (`streaming: true` in `librechat.yaml`).
 - Reasoning text is rendered in a collapsible "Thinking" block (existing LibreChat
   reasoning UI, restyled and labelled).
@@ -167,12 +175,14 @@ Per-model specs provide the labels the endpoint cannot:
   "The model provider is having trouble…". No raw stack traces or keys in the UI.
 - Default new-chat model: DeepSeek (spec `default: true`).
 
-**Decision (documents):** document creation and update use LibreChat's
-existing *artifact-in-markdown* contract, not tool calls. The model is instructed to emit a
-```document ... ``` block with `type: "document"`; updates re-emit the same artifact with an
-`identifier` and the full new Markdown. This is the most reliable path for
-DeepSeek because it needs no tool-calling support, and LibreChat already reconciles
-artifacts by identifier. Two safety nets make it robust:
+**Decision (documents and files):** editor documents use the
+`application/vnd.endowgpt.document` artifact-in-Markdown contract, not a tool call. The
+`documentsPrompt` instructs the model to emit one `:::artifact` block with the full
+Markdown; updates reuse the identifier. Real file requests use the native tools instead:
+`create_document` for `.docx`/`.md`, `create_spreadsheet` for `.xlsx`/`.csv`, and
+`create_presentation` for `.pptx`. `filesPrompt` explicitly forbids HTML/download-page
+answers and asks for one short reply after the file cards. Two safety nets make the
+editor robust:
 
 1. The client editor owns the canonical content once opened, autosaves to
    `/api/documents`, and can always update the message artifact from the editor.
@@ -187,16 +197,16 @@ The model is tested with the same prompts; see §10.
 
 ### Palette (from the logo SVGs)
 
-| Token | Hex | Use |
-|---|---|---|
-| indigo | `#534cd6` | primary accent, buttons, links |
-| teal | `#24d5d0` | secondary accent, focus rings, gradients |
-| blue | `#6fbde0` | info, charts, subtle highlights |
-| olive | `#9eab67` | tertiary accent |
-| yellow | `#e1e366` | highlight / warning-adjacent accent |
-| off-white | `#f9f3f4` | light app background |
-| gray | `#b4b4b4` | muted text, dividers |
-| logo red | `#f1352a` | mark accent only (not a UI accent) |
+| Token     | Hex       | Use                                      |
+| --------- | --------- | ---------------------------------------- |
+| indigo    | `#534cd6` | primary accent, buttons, links           |
+| teal      | `#24d5d0` | secondary accent, focus rings, gradients |
+| blue      | `#6fbde0` | info, charts, subtle highlights          |
+| olive     | `#9eab67` | tertiary accent                          |
+| yellow    | `#e1e366` | highlight / warning-adjacent accent      |
+| off-white | `#f9f3f4` | light app background                     |
+| gray      | `#b4b4b4` | muted text, dividers                     |
+| logo red  | `#f1352a` | mark accent only (not a UI accent)       |
 
 Applied through the LibreChat deployment theme in `librechat.yaml` (`interface.theme`
 inline definition, plus `interface.customWelcome`, `interface.customFooter`,
@@ -211,11 +221,11 @@ values that belong in the theme definition.
 
 ### Asset mapping (supplied files are named inversely to their artwork)
 
-| Source pack file | Actual artwork | Deployed as |
-|---|---|---|
-| `endowgpt-logo-white.svg` | dark `#111e1e` wordmark + red mark | `assets/endowgpt-logo-onlight.svg` (light theme) |
-| `endowgpt-logo-dark.svg` | white wordmark + red mark | `assets/endowgpt-logo-ondark.svg` (dark theme) |
-| `endowgpt-logo-2.svg` | gray monochrome tone-on-tone lockup | `assets/endowgpt-logo-mono.svg` (accents on dark) |
+| Source pack file          | Actual artwork                      | Deployed as                                       |
+| ------------------------- | ----------------------------------- | ------------------------------------------------- |
+| `endowgpt-logo-white.svg` | dark `#111e1e` wordmark + red mark  | `assets/endowgpt-logo-onlight.svg` (light theme)  |
+| `endowgpt-logo-dark.svg`  | white wordmark + red mark           | `assets/endowgpt-logo-ondark.svg` (dark theme)    |
+| `endowgpt-logo-2.svg`     | gray monochrome tone-on-tone lockup | `assets/endowgpt-logo-mono.svg` (accents on dark) |
 
 All three keep the source's 1500×1500 square canvas — viewBox-cropped variants
 of this artwork hit a Chromium viewport bug, so in-app crops are CSS
@@ -234,17 +244,17 @@ Raster derivatives are generated by `scripts/brand-assets.mjs`:
 
 ### Branding touchpoints
 
-| Surface | Change |
-|---|---|
-| Browser title | `APP_TITLE=endowGPT`; `index.html` `<title>` |
-| Favicon / PWA | new icons in `client/public/assets`, manifest in `client/vite.config.ts` |
-| Login | `AuthLayout` uses theme-aware endowGPT logo (`<picture>` / CSS) |
-| Sidebar / header | logo swap, no LibreChat wordmark |
-| Welcome | "What can I help you build today?" + endowGPT subtitle |
-| Starters | "Draft a document", "Build an interactive page", "Summarize a file" |
-| Footer | `customFooter` with © endowGPT + link to `/credits` |
-| About / licenses | new `/credits` route: endowGPT © notice, LibreChat MIT license text, RAG API license, third-party notices |
-| Metadata | remove upstream `LibreChat` strings from `index.html`, manifest, `package.json` description (not package name), and any user-visible copy found by `grep` |
+| Surface          | Change                                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser title    | `APP_TITLE=endowGPT`; `index.html` `<title>`                                                                                                              |
+| Favicon / PWA    | new icons in `client/public/assets`, manifest in `client/vite.config.ts`                                                                                  |
+| Login            | `AuthLayout` uses theme-aware endowGPT logo (`<picture>` / CSS)                                                                                           |
+| Sidebar / header | logo swap, no LibreChat wordmark                                                                                                                          |
+| Welcome          | "What can I help you build today?" + endowGPT subtitle                                                                                                    |
+| Starters         | "Draft a document", "Build an interactive page", "Summarize a file"                                                                                       |
+| Footer           | `customFooter` with © endowGPT + link to `/credits`                                                                                                      |
+| About / licenses | new `/credits` route: endowGPT © notice, LibreChat MIT license text, RAG API license, third-party notices                                                |
+| Metadata         | remove upstream `LibreChat` strings from `index.html`, manifest, `package.json` description (not package name), and any user-visible copy found by `grep` |
 
 `grep -ri librechat client/src --include=*.tsx --include=*.ts` is run before sign-off;
 remaining hits are allowed only in import paths, comments, license text, or `/credits`.
@@ -262,27 +272,25 @@ file is already small, so both formats are shipped and the MP4 is the fallback.
 
 ---
 
-## 6. Artifacts
+## 6. Documents and native files
 
-LibreChat already ships the artifact panel. Work is polish + a new `document` kind.
+The stock artifact system is intentionally removed. The panel has two jobs:
 
-- New artifact type `application/vnd.endowgpt.document`, aliases `document`, `doc`.
-- `ArtifactTabs` dispatches this MIME to the new `DocumentArtifact` editor instead of
-  `Markdown`.
-- Panel keeps Preview/Code tabs, copy, download, fullscreen, sandboxed iframe for HTML,
-  and adds version back/forward:
-  - Artifact content history is captured client-side per artifact identifier on each save
-    (`useArtifactHistory`), with a cap of 50 entries.
-  - Back/forward restore the artifact and push a new save through the existing
-    `POST /api/messages/artifact/:messageId` path, so the message stays the source of truth.
-- Download filenames come from artifact `title` + extension map; `document` → `.md`.
-- Sandbox: HTML previews keep `sandbox="allow-scripts"` without `allow-same-origin`;
-  external links open with `rel="noopener noreferrer"`.
-- Artifact prompts enabled on both model specs (`artifacts: true`).
-- Follow-up edits: a follow-up instruction that references an existing artifact causes the
-  model to re-emit it by `identifier`; LibreChat's reconciliation updates the existing
-  panel rather than creating a second artifact. When the document editor is open, editor
-  saves also update the message artifact so chat and editor never diverge.
+- **Editable document**: `application/vnd.endowgpt.document` (`document`, `doc` aliases)
+  dispatches to the TipTap editor. It keeps copy, download, version history, autosave,
+  AI selection edits, and the message-artifact save path
+  (`POST /api/messages/artifact/:messageId`). No Preview/Code tabs, Sandpack, Monaco,
+  fullscreen control, refresh scrim, or undocking.
+- **Generated file**: `.docx`/`.xlsx`/`.pptx` cards open the matching viewer and download
+  the original binary. The panel header has title, versions, copy (documents), download,
+  and an obvious close. On phones it is a full-screen dialog.
+
+Legacy `:::artifact` blocks for HTML/React/SVG/Mermaid/code are unwrapped and render as
+ordinary Markdown. They never reopen a panel.
+
+Follow-up editor saves update the message artifact so chat and editor do not diverge.
+File requests call `create_document` / `create_spreadsheet` / `create_presentation`, one
+call per file, and the model replies with a short summary after the cards appear.
 
 ---
 
@@ -347,15 +355,15 @@ Types and the client data service live in `packages/data-provider/src/documents.
 requires and mounting. Validation uses zod; responses are plain JSON or safe error codes
 (no raw upstream errors, per the error-disclosure rules).
 
-| Method | Path | Body / notes |
-|---|---|---|
-| `GET` | `/` | list current user's documents (id, title, conversationId, artifactId, updatedAt) |
-| `GET` | `/:conversationId/:artifactId` | full document + versions metadata |
-| `PUT` | `/:conversationId/:artifactId` | `{ title, content, baseVersionId? }` → upsert, snapshot previous content, return doc |
-| `DELETE` | `/:conversationId/:artifactId` | delete document |
-| `GET` | `/:conversationId/:artifactId/versions/:versionId` | full version content |
-| `POST` | `/:conversationId/:artifactId/restore` | `{ versionId }` → restore as new version |
-| `POST` | `/ai-edit` | `{ text, instruction, model, mode }` → `{ text }` |
+| Method   | Path                                               | Body / notes                                                                         |
+| -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `GET`    | `/`                                                | list current user's documents (id, title, conversationId, artifactId, updatedAt)     |
+| `GET`    | `/:conversationId/:artifactId`                     | full document + versions metadata                                                    |
+| `PUT`    | `/:conversationId/:artifactId`                     | `{ title, content, baseVersionId? }` → upsert, snapshot previous content, return doc |
+| `DELETE` | `/:conversationId/:artifactId`                     | delete document                                                                      |
+| `GET`    | `/:conversationId/:artifactId/versions/:versionId` | full version content                                                                 |
+| `POST`   | `/:conversationId/:artifactId/restore`             | `{ versionId }` → restore as new version                                             |
+| `POST`   | `/ai-edit`                                         | `{ text, instruction, model, mode }` → `{ text }`                                    |
 
 `ai-edit` validates `model` against an allow-list of the two configured IDs, caps input
 (20k chars, configurable via `configSchema`; see below) and output, uses a fixed system
@@ -368,10 +376,10 @@ New `configSchema` levers (all settable in `librechat.yaml`, defaults reproduce 
 
 ```yaml
 documents:
-  aiEditMaxChars: 20000        # max selected text sent to the model
-  aiEditMaxPerHour: 30         # inline edits allowed per user per hour
-  versionHistoryCap: 50        # version snapshots per document
-  autosaveDelayMs: 800         # client autosave debounce
+  aiEditMaxChars: 20000 # max selected text sent to the model
+  aiEditMaxPerHour: 30 # inline edits allowed per user per hour
+  versionHistoryCap: 50 # version snapshots per document
+  autosaveDelayMs: 800 # client autosave debounce
   allowedAiEditModels: [deepseek-v4.1-flash]
 ```
 
@@ -444,16 +452,17 @@ Environment groups documented in `.env.example`:
 
 ## 10. Tests
 
-| Layer | Test | Tooling |
-|---|---|---|
-| Unit | Markdown ↔ HTML round-trip (headings, lists, tables, links, code) | Jest, client workspace |
-| Unit | Word diff → insert/delete ranges; accept and reject transforms | Jest, client workspace |
-| Unit | Version snapshot + restore semantics (restore appends, never rewrites) | Jest + `mongodb-memory-server` (data-schemas) |
-| API | `/api/documents` auth, upsert, 409 conflict, version restore | Jest + supertest (owning workspace) |
-| API | `/ai-edit` rejects unknown models and oversized input | Jest + supertest (owning workspace) |
-| Component | Document editor states: loading, saved, conflict, pending suggestion | Jest, colocated `__tests__` |
-| E2E-ish | Boot smoke: compose up, `/health`, login page renders, no LibreChat strings | Node script |
-| Model smoke | Send "2+2?" and a document prompt to each model, assert streamed reply and artifact block | Node script (`scripts/smoke.mjs`) |
+| Layer       | Test                                                                                                               | Tooling                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| Unit        | Markdown ↔ HTML round-trip (headings, lists, tables, links, code)                                                 | Jest, client workspace                        |
+| Unit        | Word diff → insert/delete ranges; accept and reject transforms                                                     | Jest, client workspace                        |
+| Unit        | Version snapshot + restore semantics (restore appends, never rewrites)                                             | Jest + `mongodb-memory-server` (data-schemas) |
+| API         | `/api/documents` auth, upsert, 409 conflict, version restore                                                       | Jest + supertest (owning workspace)           |
+| API         | `/ai-edit` rejects unknown models and oversized input                                                              | Jest + supertest (owning workspace)           |
+| Component   | Document editor states: loading, saved, conflict, pending suggestion                                               | Jest, colocated `__tests__`                   |
+| E2E-ish     | Boot smoke: compose up, `/health`, login page renders, no LibreChat strings                                        | Node script                                   |
+| Model smoke | Send "2+2?" to each model and assert a streamed reply                                                              | Node script (`scripts/smoke.mjs`)             |
+| File smoke  | Send the md+docx+xlsx prompt and the Excel/PPTX/Word variants; assert real attachments and no HTML/artifact answer | Node script (`scripts/smoke-files.mjs`)       |
 
 The model smoke test reads `OPENCODE_API_KEY` from the environment. Without it, the test
 prints `SKIP` with a clear reason; the boot/UI checks still run. A local
@@ -468,16 +477,18 @@ Run order for sign-off:
 
 ## 11. Work order and commits
 
-| Milestone | Scope | Commit |
-|---|---|---|
-| M0 | Plan, root scaffold, `.gitignore`, `.env.example`, git init | `chore: scaffold endowGPT with plan and env template` |
-| M1 | Compose stack, `librechat.yaml`, model specs, boot check | `feat: docker stack with OpenCode-backed models` |
-| M2 | Brand assets, favicons/PWA, splash video, theme, welcome/footer/starters | `feat: endowGPT branding, theme, and logo splash` |
-| M3 | Artifact polish + document MIME + history | `feat: artifact panel polish and document artifact type` |
-| M4 | Document schema/API, TipTap editor, markdown/export, autosave | `feat: document editor with persistence and exports` |
-| M5 | Selection AI edits, diff accept/reject, versions/restore | `feat: inline AI edits, diffs, and document versions` |
-| M6 | RAG stack, file import, citations, "edit this document" | `feat: RAG search, citations, and document import` |
-| M7 | Tests, docs, report, branding sweep | `test: document, API, and boot smoke coverage` |
+| Milestone | Scope                                                                    | Commit                                                   |
+| --------- | ------------------------------------------------------------------------ | -------------------------------------------------------- |
+| M0        | Plan, root scaffold, `.gitignore`, `.env.example`, git init              | `chore: scaffold endowGPT with plan and env template`    |
+| M1        | Compose stack, `librechat.yaml`, model specs, boot check                 | `feat: docker stack with OpenCode-backed models`         |
+| M2        | Brand assets, favicons/PWA, splash video, theme, welcome/footer/starters | `feat: endowGPT branding, theme, and logo splash`        |
+| M3        | Artifact polish + document MIME + history                                | `feat: artifact panel polish and document artifact type` |
+| M4        | Document schema/API, TipTap editor, markdown/export, autosave            | `feat: document editor with persistence and exports`     |
+| M5        | Selection AI edits, diff accept/reject, versions/restore                 | `feat: inline AI edits, diffs, and document versions`    |
+| M6        | RAG stack, file import, citations, "edit this document"                  | `feat: RAG search, citations, and document import`       |
+| M7        | Tests, docs, report, branding sweep                                      | `test: document, API, and boot smoke coverage`           |
+| M8        | Read-only superadmin portal                                              | `feat: read-only superadmin portal`                      |
+| M9        | Documents-only simplification + native file generation                   | `refactor: documents-only chat with native file tools`   |
 
 Each milestone ends with a working `docker compose up -d`, no uncommitted debris, and a
 `CHANGES.md` update when core files were touched.
@@ -486,16 +497,17 @@ Each milestone ends with a working `docker compose up -d`, no uncommitted debris
 
 ## 12. Risks and mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Upstream model rejects artifact emulation or truncates long documents | Keep editor authoritative; targeted edits via `/ai-edit`; cap document prompt size and rely on editor for long content |
-| DeepSeek tool-calling behavior | No document tool calls; artifact-in-markdown + REST fallback |
-| `npm ci` inside Docker needs lockfile updated | Add client deps with `npm install` at repo root, commit `package-lock.json` |
-| Large SVG logos inflate bundle | Ship cropped SVGs for UI, rasterized PNGs for icons, keep originals at root only |
-| RAG first boot races embeddings | `ollama-init` completion gates `rag_api`; health checks on all |
-| Version history growth | Cap 50 snapshots per document; prune oldest on write |
-| Core edits drift from upstream | Small, isolated edits; every one listed in `CHANGES.md`; feature code in new modules |
-| Secrets leakage | `.env` gitignored, only `${VAR}` in YAML, smoke script never prints tokens |
+| Risk                                                          | Mitigation                                                                                                                                                                               |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The model answers a file request with HTML or a download page | `filesPrompt` explicitly forbids it; tool descriptions name the exact formats; `scripts/smoke-files.mjs` checks the real turn; if it still happens, force tool choice for file requests. |
+| The model confuses the editor with a file request             | `documentsPrompt` limits the editor to explicit editor requests and points file formats at the native tools.                                                                             |
+| DeepSeek tool-calling behavior                                | No document tool calls; artifact-in-markdown + REST fallback                                                                                                                             |
+| `npm ci` inside Docker needs lockfile updated                 | Add client deps with `npm install` at repo root, commit `package-lock.json`                                                                                                              |
+| Large SVG logos inflate bundle                                | Ship cropped SVGs for UI, rasterized PNGs for icons, keep originals at root only                                                                                                         |
+| RAG first boot races embeddings                               | `ollama-init` completion gates `rag_api`; health checks on all                                                                                                                           |
+| Version history growth                                        | Cap 50 snapshots per document; prune oldest on write                                                                                                                                     |
+| Core edits drift from upstream                                | Small, isolated edits; every one listed in `CHANGES.md`; feature code in new modules                                                                                                     |
+| Secrets leakage                                               | `.env` gitignored, only `${VAR}` in YAML, smoke script never prints tokens                                                                                                               |
 
 ---
 
@@ -509,8 +521,10 @@ Each milestone ends with a working `docker compose up -d`, no uncommitted debris
    login, sidebar, welcome, footer, and About/credits page.
 4. Splash plays once per session, is muted/skippable, and is replaced by a static logo for
    reduced motion.
-5. Artifacts open in a resizable panel with Preview/Code, copy, download, fullscreen,
-   sandboxing, and back/forward versions for both models.
+5. The documents-only panel opens with copy, download, versions, and an obvious close;
+   generated files open their viewer. No sandbox, code tabs, fullscreen viewer, or undocking.
+   5b. Asking for `.md` + `.docx` + `.xlsx` produces three real file cards (and the Excel,
+   PPTX, and Word variants each produce their own), with no HTML or artifact answer.
 6. A document can be created from chat, edited with formatting, edited by AI selection with
    accept/reject, versioned/restored, exported to MD/DOCX/PDF, and reopened from the
    conversation after a restart.

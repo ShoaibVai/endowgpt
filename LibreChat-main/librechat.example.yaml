@@ -301,9 +301,6 @@ interface:
     public: false
   bookmarks: true
   multiConvo: true
-  # Allow the artifacts pane to be moved into its own browser window
-  # (desktop only; the mobile sheet is unaffected). Default: true.
-  artifactUndocking: true
   # Ask each viewer before loading Google Tag Manager (ANALYTICS_GTM_ID).
   # Set false when the deployment settles consent itself, e.g. internal use. Default: true.
   # analyticsConsent: true
@@ -396,11 +393,10 @@ interface:
   #   requestTimeoutMs: 10000
   # Tools pinned to the prompt bar by default for all users.
   # Only seeds the initial state — once a user pins/unpins a tool, their choice is kept.
-  # Valid tool keys: artifacts, execute_code, web_search, file_search, skills.
+  # Valid tool keys: execute_code, web_search, file_search, skills.
   # Use 'mcp' (or a specific MCP server name) to pin the MCP servers dropdown.
   # When omitted, tools start unpinned and the MCP dropdown keeps its default (pinned).
   # defaultPinnedTools:
-  #   - 'artifacts'
   #   - 'execute_code'
   #   - 'mcp'
   # Remote Agents configuration
@@ -910,7 +906,7 @@ endpoints:
   #   # (optional) Agent Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
   #   # web_search controls only LibreChat's external pipeline, not provider-native search.
   #   # Both require WEB_SEARCH.USE, seeded by interface.webSearch. See UPGRADING.md.
-  #   capabilities: ["deferred_tools", "execute_code", "file_search", "web_search", "artifacts", "subagents", "actions", "context", "skills", "memory", "ask_user_question", "tools", "ocr"]
+  #   capabilities: ["deferred_tools", "execute_code", "file_search", "web_search", "subagents", "actions", "context", "skills", "memory", "ask_user_question", "tools", "ocr"]
   #   # The following capabilities are opt-in and must be added explicitly:
   #   # "programmatic_tools", "stateful_code_sessions", "run_in_background", "tool_intents"
   #   # "stateful_code_sessions" is highly experimental and may change substantially.

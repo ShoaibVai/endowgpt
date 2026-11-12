@@ -114,7 +114,8 @@ jest.mock('~/files', () => ({
 }));
 
 jest.mock('~/prompts', () => ({
-  generateArtifactsPrompt: jest.fn(() => null),
+  documentsPrompt: 'Document guidance',
+  filesPrompt: 'File guidance',
 }));
 
 jest.mock('../resources', () => ({
@@ -1287,7 +1288,9 @@ describe('initializeAgent: ChatProject context', () => {
       db,
     );
 
-    expect(result.additional_instructions).toBe('Auxiliary Agent guidance.');
+    expect(result.additional_instructions).toBe(
+      'Auxiliary Agent guidance.\n\nDocument guidance\n\nFile guidance',
+    );
     expect(result.additional_instructions).not.toContain('Project guidance');
     expect(result.tool_resources).toBeUndefined();
   });
@@ -2212,7 +2215,7 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
 
     expect(result.instructions).toBeUndefined();
     expect(result.additional_instructions).toBe(
-      'Today is 2026-08-31 (Monday). The turn began at 2026-08-31 06:20:00 +00:00 (Monday) (2026-08-31T06:20:00.000Z).',
+      'Today is 2026-08-31 (Monday). The turn began at 2026-08-31 06:20:00 +00:00 (Monday) (2026-08-31T06:20:00.000Z).\n\nDocument guidance\n\nFile guidance',
     );
   });
 
@@ -2237,7 +2240,7 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
 
     expect(result.instructions).toBeUndefined();
     expect(result.additional_instructions).toBe(
-      'It is currently 2024-01-15 13:30:00 -05:00 (Monday).',
+      'It is currently 2024-01-15 13:30:00 -05:00 (Monday).\n\nDocument guidance\n\nFile guidance',
     );
   });
 
@@ -2260,18 +2263,19 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
     );
 
     expect(result.instructions).toBe('You are helping Test User.');
-    expect(result.additional_instructions).toBeUndefined();
+    expect(result.additional_instructions).toBe('Document guidance\n\nFile guidance');
   });
 
-  it('appends generated artifact guidance without replacing existing dynamic instructions', async () => {
-    const { generateArtifactsPrompt } = jest.requireMock('~/prompts') as {
-      generateArtifactsPrompt: jest.Mock;
-    };
-    generateArtifactsPrompt.mockReturnValue('Artifact guidance');
-
-    const { agent, req, res, loadTools, db } = createMocks();
-    agent.additional_instructions = 'Existing dynamic';
-    agent.artifacts = 'enabled' as never;
+  it('keeps native file tools and file guidance in the initialized agent', async () => {
+    const fileTools = [
+      { name: 'create_spreadsheet' },
+      { name: 'create_document' },
+      { name: 'create_presentation' },
+    ];
+    const { agent, req, res, loadTools, db } = createMocks({
+      structuredTools: fileTools,
+      loadedToolDefinitions: fileTools,
+    });
 
     const result = await initializeAgent(
       {
@@ -2286,7 +2290,33 @@ describe('initializeAgent — stable and dynamic instruction fields', () => {
       db,
     );
 
-    expect(result.additional_instructions).toBe('Existing dynamic\n\nArtifact guidance');
+    expect((result.tools ?? []).map((tool) => (tool as { name?: string }).name)).toEqual(
+      expect.arrayContaining(['create_spreadsheet', 'create_document', 'create_presentation']),
+    );
+    expect(result.additional_instructions).toContain('File guidance');
+    expect(result.additional_instructions).not.toContain('Artifacts are substantial');
+  });
+
+  it('appends document and file guidance without replacing existing dynamic instructions', async () => {
+    const { agent, req, res, loadTools, db } = createMocks();
+    agent.additional_instructions = 'Existing dynamic';
+
+    const result = await initializeAgent(
+      {
+        req,
+        res,
+        agent,
+        loadTools,
+        endpointOption: { endpoint: EModelEndpoint.agents },
+        allowedProviders: new Set([Providers.OPENAI]),
+        isInitialAgent: true,
+      },
+      db,
+    );
+
+    expect(result.additional_instructions).toBe(
+      'Existing dynamic\n\nDocument guidance\n\nFile guidance',
+    );
   });
 });
 

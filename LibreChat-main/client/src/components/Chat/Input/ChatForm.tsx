@@ -4,6 +4,7 @@ import { useWatch } from 'react-hook-form';
 import { useAtom, useAtomValue } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import { useDirection } from '@radix-ui/react-direction';
+import { Constants, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useSteering, showStopButtonByIndex, useComposerRestoreHost } from '@librechat/chat/react';
 import {
   submitFromComposer,
@@ -18,13 +19,6 @@ import {
   useRemScale,
 } from '@librechat/client';
 import {
-  Constants,
-  Permissions,
-  PermissionTypes,
-  isAgentsEndpoint,
-  isAssistantsEndpoint,
-} from 'librechat-data-provider';
-import {
   PastedTextDialog,
   QuoteButton,
   composerHintId,
@@ -35,17 +29,6 @@ import type { TChatProject, TMessage, TConversation } from 'librechat-data-provi
 import type { QueuedMessageContext } from '@librechat/chat';
 import type { SetterOrUpdater } from 'recoil';
 import type { ExtendedFile, FileSetter, ConvoGenerator, TAskFunction } from '~/common';
-import {
-  cn,
-  getModelSpec,
-  hasIncompleteFiles,
-  removeFocusRings,
-  getComposerDraftId,
-  getPendingDraftId,
-  clearAllDrafts,
-  getFilesDraftCached,
-  isPastedTextFileMarked,
-} from '~/utils';
 import {
   useTextarea,
   useAutoSave,
@@ -58,16 +41,23 @@ import {
   useCodeWorkspace,
 } from '~/hooks';
 import {
+  cn,
+  hasIncompleteFiles,
+  removeFocusRings,
+  getComposerDraftId,
+  getPendingDraftId,
+  clearAllDrafts,
+  getFilesDraftCached,
+  isPastedTextFileMarked,
+} from '~/utils';
+import {
   useChatContext,
   useChatFormContext,
   useAddedChatContext,
   useAssistantsMapContext,
   BadgeRowProvider,
 } from '~/Providers';
-import {
-  PendingToolApprovalButton,
-  PendingToolApprovalPanel,
-} from '~/components/Chat/approval/Review';
+import { PendingToolApprovalPanel } from '~/components/Chat/approval/Review';
 import { WatchedSendButton, WatchedDuringRunSendButton } from './watched';
 import useComposerRestore from '~/hooks/Input/useComposerRestore';
 import { useChatSettings } from '~/Providers/ChatSettingsContext';
@@ -78,21 +68,14 @@ import useComposerItems from '~/hooks/Input/useComposerItems';
 import useAttachTarget from '~/hooks/Input/useAttachTarget';
 import { chatDirectionAtom } from '~/store/chatDirection';
 import ProjectLandingChip from '../ProjectLandingChip';
-import useHasAccess from '~/hooks/Roles/useHasAccess';
 import useDictation from '~/hooks/Input/useDictation';
-import { useGetStartupConfig } from '~/data-provider';
-import CodeWorkspaceMenu from './CodeWorkspaceMenu';
-import CodeApprovalMenu from './CodeApprovalMenu';
 import TextareaHeader from './TextareaHeader';
-import PromptsCommand from './PromptsCommand';
-import SkillsCommand from './SkillsCommand';
 import AutoPlayAudio from './AutoPlayAudio';
 import { mainTextareaId } from '~/common';
 import ToolDialogs from './ToolDialogs';
 import Queue from './Composer/Queue';
 import Tray from './Composer/Tray';
 import Bar from './Composer/Bar';
-import Mention from './Mention';
 import store from '~/store';
 
 interface ChatFormProps {
@@ -166,10 +149,8 @@ const ChatForm = memo(function ChatForm({
   files,
   setFiles,
   conversation,
-  setConversation,
   isSubmitting,
   setFilesLoading,
-  newConversation,
   handleStopGenerating,
   stopGenerating,
 }: ChatFormProps) {
@@ -199,39 +180,21 @@ const ChatForm = memo(function ChatForm({
   const { isTemporary } = useChatSettings();
 
   const [showStopButton, setShowStopButton] = useAtom(showStopButtonByIndex(index));
-  const plusPopoverAtom = useMemo(() => store.showPlusPopoverFamily(index), [index]);
-  const mentionPopoverAtom = useMemo(() => store.showMentionPopoverFamily(index), [index]);
 
   const { requiresKey } = useRequiresKey();
   const methods = useChatFormContext();
-  const {
-    generateConversation,
-    conversation: addedConvo,
-    setConversation: setAddedConvo,
-  } = useAddedChatContext();
+  const { conversation: addedConvo, setConversation: setAddedConvo } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
-  const { data: startupConfig } = useGetStartupConfig();
 
   const endpoint = useMemo(
     () => conversation?.endpointType ?? conversation?.endpoint,
     [conversation?.endpointType, conversation?.endpoint],
   );
-  const modelSpec = useMemo(
-    () => getModelSpec({ specName: conversation?.spec, startupConfig }),
-    [conversation?.spec, startupConfig],
-  );
   const filesLoading = useMemo(() => hasIncompleteFiles(files), [files]);
-  /** Agents and assistants carry their own tool configuration, so the composer's
-   *  ephemeral tool controls only apply elsewhere, and a spec can suppress them
-   *  outright. Same gate the old `showEphemeralBadges` prop applied. */
-  const showTools = useMemo(
-    () =>
-      !!endpoint &&
-      modelSpec?.hideBadgeRow !== true &&
-      !isAgentsEndpoint(endpoint) &&
-      !isAssistantsEndpoint(endpoint),
-    [endpoint, modelSpec?.hideBadgeRow],
-  );
+  /** The simple composer is a message field with attach and send: built-in tool
+   *  chips, MCP servers, skills, and code approvals belong to the developer
+   *  surfaces this fork hides. Uploads stay available through the palette. */
+  const showTools = false;
   const conversationId = useMemo(
     () => conversation?.conversationId ?? Constants.NEW_CONVO,
     [conversation?.conversationId],
@@ -365,7 +328,7 @@ const ChatForm = memo(function ChatForm({
     [isActionPending],
   );
 
-  const { submitMessage, submitPrompt } = useSubmitMessage();
+  const { submitMessage } = useSubmitMessage();
   const codeWorkspace = useCodeWorkspace(conversation, addedConvo);
 
   /** Queued/steered sends carry their FULL submission context: explicit
@@ -529,19 +492,9 @@ const ChatForm = memo(function ChatForm({
 
   const composerItems = useComposerItems(conversationId, quotesEnabled);
   const attachTarget = useAttachTarget(conversation, disableInputs);
-  const hasPromptsAccess = useHasAccess({
-    permissionType: PermissionTypes.PROMPTS,
-    permission: Permissions.USE,
-  });
-  const slashCommandEnabled = useRecoilValue(store.slashCommand);
-  const atCommandEnabled = useRecoilValue(store.atCommand);
   const idleActions = useMemo(
-    () => ({
-      prompts: hasPromptsAccess && slashCommandEnabled,
-      mentions: atCommandEnabled,
-      attach: attachTarget.canAttach,
-    }),
-    [hasPromptsAccess, slashCommandEnabled, atCommandEnabled, attachTarget.canAttach],
+    () => ({ prompts: false, mentions: false, attach: attachTarget.canAttach }),
+    [attachTarget.canAttach],
   );
   const { submitText: submitAnswerText } = answerMode;
   const dictationAnswerModeActive = answerMode.composerAnswers;
@@ -750,7 +703,7 @@ const ChatForm = memo(function ChatForm({
            asked for less motion gets the new position outright — this one is a
            slide across the page rather than decoration. */
         'mx-auto flex w-full flex-row gap-3 transition-[max-width,margin-bottom] duration-300 motion-reduce:transition-none sm:px-2',
-        maximizeChatSpace ? 'max-w-full' : 'md:max-w-3xl xl:max-w-4xl',
+        maximizeChatSpace ? 'max-w-full' : 'md:max-w-[43.75rem] xl:max-w-[47.5rem]',
         bottomClearance,
       )}
     >
@@ -772,43 +725,15 @@ const ChatForm = memo(function ChatForm({
               onStartNewChat={startQueuedInNewChat}
             />
           )}
-          {(project || codeWorkspace.visible) && (
+          {project && (
             <div
               data-testid="composer-context-rail"
-              className={cn(
-                'mx-4 -mb-3 flex min-w-0 flex-wrap items-center gap-1.5 rounded-t-2xl',
-                'border-border-light bg-surface-secondary border px-2 pt-2 pb-5',
-              )}
+              className="border-border-light bg-surface-secondary mx-4 -mb-3 flex min-w-0 flex-wrap items-center gap-1.5 rounded-t-2xl border px-2 pt-2 pb-5"
             >
-              {project ? <ProjectLandingChip project={project} /> : null}
-              {codeWorkspace.visible ? (
-                <div className="min-w-0">
-                  <CodeWorkspaceMenu
-                    setConversation={setConversation}
-                    workspace={codeWorkspace}
-                    disabled={disableInputs || isSubmitting}
-                  />
-                </div>
-              ) : null}
+              <ProjectLandingChip project={project} />
             </div>
           )}
           <div className="flex w-full items-center">
-            <Mention
-              index={index}
-              popoverAtom={plusPopoverAtom}
-              newConversation={generateConversation}
-              textAreaRef={textAreaRef}
-              commandChar="+"
-              placeholder="com_ui_add_model_preset"
-              includeAssistants={false}
-            />
-            <Mention
-              index={index}
-              popoverAtom={mentionPopoverAtom}
-              newConversation={newConversation}
-              textAreaRef={textAreaRef}
-            />
-            <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
             {index === 0 && (
               <AskUserQuestionPopover conversationId={conversationId} textAreaRef={textAreaRef} />
             )}
@@ -818,12 +743,6 @@ const ChatForm = memo(function ChatForm({
                 triggerRef={approvalTriggerRef}
               />
             )}
-            <SkillsCommand
-              index={index}
-              textAreaRef={textAreaRef}
-              conversationId={conversationId}
-              agentId={conversation?.agent_id}
-            />
             <div
               ref={composerBoxRef}
               data-testid="composer-surface"
@@ -1004,30 +923,10 @@ const ChatForm = memo(function ChatForm({
                   setFilesLoading={setFilesLoading}
                   canAttach={attachTarget.canAttach}
                   anchorRef={composerBoxRef}
-                  showTools={showTools}
-                  isSubmitting={isSubmitting}
                   showSpeech={SpeechToText}
                   speechDisabled={speechDisabled}
                   dictation={dictation}
-                  approvalSlot={
-                    <div className="flex items-center gap-1.5">
-                      <CodeApprovalMenu
-                        conversation={conversation}
-                        addedConversation={addedConvo}
-                        codeEnvironmentMode={codeWorkspace.mode}
-                        setConversation={setConversation}
-                        disabled={disableInputs}
-                      />
-                      {index === 0 && conversationId != null && (
-                        <PendingToolApprovalButton
-                          conversationId={conversationId}
-                          triggerRef={approvalTriggerRef}
-                        />
-                      )}
-                    </div>
-                  }
                   actionSlot={actionSlot}
-                  hasAddedConversation={addedConvo != null}
                 />
                 <ToolDialogs />
               </BadgeRowProvider>

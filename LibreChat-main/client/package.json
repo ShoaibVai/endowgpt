@@ -31,7 +31,6 @@
   "dependencies": {
     "@ariakit/react": "^0.4.29",
     "@ariakit/react-components": "^0.1.2",
-    "@codesandbox/sandpack-react": "^2.19.10",
     "@dicebear/collection": "^9.4.3",
     "@dicebear/core": "^9.4.3",
     "@headlessui/react": "^2.1.2",
@@ -42,7 +41,6 @@
     "@marsidev/react-turnstile": "^1.1.0",
     "@mcp-ui/client": "^5.7.0",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
-    "@monaco-editor/react": "^4.7.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.218.0",
     "@opentelemetry/resources": "2.7.1",
     "@opentelemetry/sdk-trace-base": "2.7.1",
@@ -120,7 +118,6 @@
     "micromark-extension-math": "^3.1.0",
     "micromark-util-character": "^2.1.0",
     "micromark-util-symbol": "^2.0.0",
-    "monaco-editor": "^0.56.0",
     "morphicons": "^1.4.1",
     "pdfjs-dist": "5.4.296",
     "qrcode.react": "^4.2.0",

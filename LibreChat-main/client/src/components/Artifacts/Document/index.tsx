@@ -31,7 +31,6 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import type { editor as monacoEditor } from 'monaco-editor';
 import type { Artifact } from '~/common';
 import {
   useEditArtifact,
@@ -47,7 +46,6 @@ import {
 } from './suggestionActions';
 import { copyAsRichText, markdownToDocxBlob, markdownToPdfBlob } from './exporters';
 import { EndowDeleteMark, EndowInsertMark } from './tiptapMarks';
-import { ArtifactCodeEditor } from '../ArtifactCodeEditor';
 import { TOOL_ARTIFACT_TYPES } from '~/utils/artifacts';
 import { useArtifactsContext } from '~/Providers';
 import { htmlToMd, mdToHtml } from './markdown';
@@ -96,7 +94,6 @@ export default function DocumentArtifactTabs({
   /** Shared transcripts render read-only; a missing message index is fine for
    *  store-backed documents (the /documents route has no message to edit). */
   const readOnly = isSharedConvo === true;
-  const monacoRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
   /** The selection edits ride the deployment's default model (allow-listed
    *  server-side); falling back to the first spec when none is marked default. */
   const aiEditModel = useMemo(() => {
@@ -518,14 +515,6 @@ export default function DocumentArtifactTabs({
         <div className="prose prose-sm bg-surface-primary text-text-primary max-w-none px-8 py-6">
           <EditorContent editor={editor} />
         </div>
-      </Tabs.Content>
-      <Tabs.Content
-        value="code"
-        id="artifacts-markdown-source"
-        className="min-h-0 w-full flex-1 overflow-hidden"
-        tabIndex={-1}
-      >
-        <ArtifactCodeEditor artifact={artifact} monacoRef={monacoRef} readOnly={readOnly} />
       </Tabs.Content>
       {showVersions && conversationId != null && (
         <VersionsDrawer

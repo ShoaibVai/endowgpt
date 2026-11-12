@@ -15,9 +15,6 @@ import { getE2EUser } from '../../../setup/user';
 
 const userEmail = getE2EUser().email;
 const ROOT_PARENT = '00000000-0000-0000-0000-000000000000';
-const ARTIFACT_TEXT =
-  ':::artifact{identifier="compaction-demo" type="text/html" title="Demo"}\n```html\n<div>demo</div>\n```\n:::';
-
 type Part = Record<string, unknown>;
 
 const summaryPart = (text: string, extra: Part = {}): Part => ({
@@ -551,35 +548,6 @@ test.describe('compaction rerun controls', () => {
         page.getByText('Rerunning replays the user message before a response', { exact: false }),
       ).toBeVisible();
       await expect(editor).toHaveAttribute('aria-keyshortcuts', 'Control+S Meta+S Escape');
-    } finally {
-      await cleanup(conversationId);
-    }
-  });
-
-  test('a chained reply made only of an artifact offers no editor @scenario:artifact-only-chained-reply-offers-no-editor', async ({
-    page,
-  }) => {
-    const { answerId, messages } = precedingTurns('an artifact');
-    const artifactId = randomUUID();
-    const conversationId = await seedBranch([
-      ...messages,
-      {
-        messageId: artifactId,
-        parentMessageId: answerId,
-        text: '',
-        isCreatedByUser: false,
-        sender: 'OpenAI',
-        content: [{ type: 'text', text: ARTIFACT_TEXT }],
-      },
-    ]);
-    try {
-      const row = await openRow(page, conversationId, artifactId);
-
-      /* The artifact keeps its read-only renderer, so the editor would open with
-         no field and one inert Rerun. */
-      await expect(row.getByTestId('copy-response-button')).toBeVisible();
-      await expect(page.locator(`[id="edit-${artifactId}"]`)).toHaveCount(0);
-      await expect(page.getByTestId('regenerate-generation-button')).toHaveCount(0);
     } finally {
       await cleanup(conversationId);
     }

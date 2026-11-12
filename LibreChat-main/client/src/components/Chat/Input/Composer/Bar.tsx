@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState, useCallback } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { useElementSize } from '@librechat/chat/react';
 import { ComposerChip as Chip } from '@librechat/chat/components';
@@ -13,9 +13,7 @@ import MCPConfigDialog from '~/components/MCP/MCPConfigDialog';
 import useToolFavorites from '~/hooks/Input/useToolFavorites';
 import useChipPacking from '~/hooks/Input/useChipPacking';
 import { useBadgeRowContext } from '~/Providers';
-import TokenUsage from '../TokenUsage';
 import { useLocalize } from '~/hooks';
-import Thinking from './Thinking';
 import Palette from './Palette';
 import { cn } from '~/utils';
 
@@ -194,13 +192,8 @@ interface BarProps {
   canAttach: boolean;
   /** The composer box, which the palette anchors to instead of its own button. */
   anchorRef: React.RefObject<HTMLElement>;
-  /** Mirrors the old `showEphemeralBadges` gate: agents and assistants carry
-   *  their own tool config, and a spec can suppress the row outright. */
-  showTools: boolean;
-  isSubmitting: boolean;
   showSpeech: boolean;
   speechDisabled: boolean;
-  hasAddedConversation: boolean;
   /** Code approval and review controls supplied by the composer shell. */
   approvalSlot?: React.ReactNode;
   /** Send, stop or the during-run split button, decided by the caller. */
@@ -229,34 +222,21 @@ function Bar({
   setFilesLoading,
   canAttach,
   anchorRef,
-  showTools,
-  isSubmitting,
   showSpeech,
   speechDisabled,
-  hasAddedConversation,
   approvalSlot,
   actionSlot,
   dictation,
 }: BarProps) {
   const localize = useLocalize();
   const context = useBadgeRowContext();
-  /* Latched on the palette's first open and never released: the skills catalog
-     is only walked for composers whose palette was actually used, and closing
-     it keeps the pages cached rather than refetching per open. */
-  const [catalogWanted, setCatalogWanted] = useState(false);
-  const [catalogOpenRevision, setCatalogOpenRevision] = useState(0);
-  const onPaletteOpen = useCallback(() => {
-    setCatalogWanted(true);
-    setCatalogOpenRevision((revision) => revision + 1);
-  }, []);
   const favorites = useToolFavorites();
   const allEntries = usePaletteEntries({
     conversationId,
     agentId,
-    enabled: showTools || agentId != null,
-    toolsEnabled: showTools,
-    catalogEnabled: catalogWanted,
-    catalogOpenRevision,
+    enabled: false,
+    toolsEnabled: false,
+    catalogEnabled: false,
     favoriteKeys: favorites.keys,
   });
 
@@ -403,7 +383,6 @@ function Bar({
             entries={entries}
             disabled={disabled}
             dictating={dictating}
-            onOpened={onPaletteOpen}
             onCancel={dictation.cancel}
             agentId={agentId}
             endpoint={endpoint}
@@ -460,14 +439,7 @@ function Bar({
                   ? 'pointer-events-none translate-y-3 opacity-0'
                   : 'translate-y-0 opacity-100',
               )}
-            >
-              <Thinking
-                index={index}
-                disabled={disabled}
-                hasAddedConversation={hasAddedConversation}
-              />
-              <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
-            </div>
+            ></div>
             {/* Arrives and leaves in depth. The elapsed time is not one of the
                 things that stepped aside, so it has nowhere to travel from:
                 it comes forward into the row and recedes back out of it. */}

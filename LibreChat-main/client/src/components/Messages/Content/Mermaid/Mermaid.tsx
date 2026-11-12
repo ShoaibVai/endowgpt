@@ -1,49 +1,22 @@
-import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 import { Button, Spinner } from '@librechat/client';
-import { useRecoilValue, useSetRecoilState } from 'recoil';
 import type { ProcessedMermaidSvg } from '~/utils/diagram/export';
-import ArtifactRow from '~/components/Chat/Messages/Content/Parts/ArtifactRow';
-import { MERMAID_ARTIFACT_TYPE, type Artifact } from '~/common/artifacts';
-import { artifactRowKind } from '~/utils/artifacts';
 import useSvgProcessing from './useSvgProcessing';
-import { useMessageContext } from '~/Providers';
 import useMermaidZoom from './useMermaidZoom';
 import MermaidDialog from './MermaidDialog';
 import MermaidHeader from './MermaidHeader';
 import ZoomControls from './ZoomControls';
-import { isArtifactRoute } from '~/utils';
 import { useLocalize } from '~/hooks';
 import cn from '~/utils/cn';
-import store from '~/store';
 
 interface MermaidProps {
   children: string;
   id?: string;
   theme?: string;
-  artifact?: Artifact;
-  /**
-   * Saves the file a code-execution diagram came from. Once the diagram
-   * collapses into its trigger row, the row owns this action the way every
-   * other file-backed artifact row does, so the caller's own header can
-   * step aside instead of repeating the filename beside it.
-   */
-  onDownload?: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  /** Reports whether the diagram is currently rendered as its trigger row. */
-  onRowModeChange?: (isRow: boolean) => void;
-  /**
-   * Name to show on the trigger row, when the caller holds a friendlier one
-   * than the artifact's raw title — a sandbox-generated `_.flow-abcdef.mmd`
-   * reads as `.flow.mmd` through `displayFilename`, and the row (plus its
-   * download button's accessible name) must not regress to the internal
-   * filename the way it would by falling back to `artifact.title`.
-   */
-  rowTitle?: string;
 }
 
-interface MermaidRendererProps
-  extends Omit<MermaidProps, 'artifact' | 'onDownload' | 'onRowModeChange' | 'rowTitle'> {
+interface MermaidRendererProps extends MermaidProps {
   fillContainer?: boolean;
   onExpand?: () => void;
   onExportReady?: (data: ProcessedMermaidSvg | null) => void;
@@ -52,144 +25,13 @@ interface MermaidRendererProps
   showHeader?: boolean;
 }
 
-const Mermaid: React.FC<MermaidProps> = memo((props) => {
-  const {
-    children,
-    id,
-    theme,
-    artifact: artifactProp,
-    onDownload,
-    onRowModeChange,
-    rowTitle,
-  } = props;
-  const localize = useLocalize();
-  const location = useLocation();
+const Mermaid: React.FC<MermaidProps> = memo(({ children, id, theme }) => {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const { messageId, partIndex } = useMessageContext();
-  const artifactButtonRef = useRef<HTMLButtonElement>(null);
-  const shouldFocusArtifactCardRef = useRef(false);
-  const currentArtifactId = useRecoilValue(store.currentArtifactId);
-  const setArtifacts = useSetRecoilState(store.artifactsState);
-  const setCurrentArtifactId = useSetRecoilState(store.currentArtifactId);
-  const setArtifactsVisible = useSetRecoilState(store.artifactsVisibility);
-  const defaultTitle = localize('com_ui_mermaid_diagram');
-  const canOpenArtifact = isArtifactRoute(location.pathname);
-  /* Each content part renders its own markdown tree, so the per-message
-   * Mermaid counter restarts at zero in every part: diagrams sitting either
-   * side of a tool call would otherwise share an id within one message. */
-  const artifactScope = messageId ? `${messageId}-part${partIndex ?? 0}` : instanceId;
-  const artifactId = `mermaid-artifact-${artifactScope}-${id || instanceId}`;
-  const artifact = useMemo<Artifact>(() => {
-    if (artifactProp != null) {
-      return {
-        ...artifactProp,
-        type: artifactProp.type ?? MERMAID_ARTIFACT_TYPE,
-        title: artifactProp.title ?? defaultTitle,
-        content: children,
-        messageId: artifactProp.messageId ?? messageId,
-      };
-    }
-
-    return {
-      id: artifactId,
-      identifier: artifactId,
-      type: MERMAID_ARTIFACT_TYPE,
-      title: defaultTitle,
-      content: children,
-      messageId,
-      lastUpdateTime: Date.now(),
-    };
-  }, [artifactId, artifactProp, children, defaultTitle, messageId]);
-  const isSelected = currentArtifactId === artifact.id;
-  const [isArtifactCard, setIsArtifactCard] = useState(() => canOpenArtifact && isSelected);
-
-  const registerArtifact = useCallback(() => {
-    setArtifacts((previousArtifacts) => {
-      const existingArtifact = previousArtifacts?.[artifact.id];
-      if (
-        existingArtifact != null &&
-        existingArtifact.content === artifact.content &&
-        existingArtifact.type === artifact.type &&
-        existingArtifact.title === artifact.title
-      ) {
-        return previousArtifacts;
-      }
-
-      return { ...(previousArtifacts ?? {}), [artifact.id]: artifact };
-    });
-  }, [artifact, setArtifacts]);
-
-  const openArtifact = useCallback(() => {
-    registerArtifact();
-    setCurrentArtifactId(artifact.id);
-    setArtifactsVisible(true);
-  }, [artifact.id, registerArtifact, setArtifactsVisible, setCurrentArtifactId]);
-
-  const handleExpand = useCallback(() => {
-    shouldFocusArtifactCardRef.current = true;
-    setIsArtifactCard(true);
-    openArtifact();
-  }, [openArtifact]);
-
-  const handleArtifactClick = useCallback(() => {
-    if (!isSelected) {
-      openArtifact();
-      return;
-    }
-
-    setCurrentArtifactId(null);
-    setArtifactsVisible(false);
-  }, [isSelected, openArtifact, setArtifactsVisible, setCurrentArtifactId]);
-
-  /* Closing the panel unmounts `Artifacts`, whose `useArtifacts` cleanup wipes
-   * `artifactsState`. Subscribing to this diagram's slice re-fires the
-   * registration once it goes missing, so reopening any card restores every
-   * expanded diagram to the version navigator rather than just the one
-   * clicked. `registerArtifact` no-ops when the entry already matches, so this
-   * cannot loop. Mirrors the self-heal in `ToolArtifactCard`. */
-  const existingEntry = useRecoilValue(store.artifactByIdSelector(artifact.id));
-
-  useEffect(() => {
-    if (!isArtifactCard) {
-      return;
-    }
-    registerArtifact();
-  }, [existingEntry, isArtifactCard, registerArtifact]);
-
-  useEffect(() => {
-    if (!isArtifactCard || !shouldFocusArtifactCardRef.current) {
-      return;
-    }
-    artifactButtonRef.current?.focus();
-    shouldFocusArtifactCardRef.current = false;
-  }, [isArtifactCard]);
-
-  const isRowMode = canOpenArtifact && isArtifactCard;
-  useEffect(() => {
-    onRowModeChange?.(isRowMode);
-  }, [isRowMode, onRowModeChange]);
-
-  if (isRowMode) {
-    return (
-      <ArtifactRow
-        ref={artifactButtonRef}
-        artifactId={artifact.id}
-        title={rowTitle ?? artifact.title ?? defaultTitle}
-        kind={artifactRowKind(artifact)}
-        isSelected={isSelected}
-        onOpen={handleArtifactClick}
-        onDownload={onDownload}
-      />
-    );
-  }
+  const defaultTitle = useLocalize()('com_ui_mermaid_diagram');
+  const rendererId = id || instanceId;
 
   return (
-    <MermaidRenderer
-      id={id}
-      theme={theme}
-      exportFilename={artifact.title ?? defaultTitle}
-      onExpand={canOpenArtifact ? handleExpand : undefined}
-    >
+    <MermaidRenderer id={rendererId} theme={theme} exportFilename={defaultTitle}>
       {children}
     </MermaidRenderer>
   );
@@ -334,7 +176,7 @@ export const MermaidRenderer = memo(function MermaidRenderer({
                 showCode={showCode}
                 showExpandButton={showExpandButton}
                 expandButtonRef={expandButtonRef}
-                expandLabel={onExpand != null ? localize('com_ui_open_as_artifact') : undefined}
+                expandLabel={undefined}
                 exportSvg={processedSvg}
                 exportDimensions={svgDimensions}
                 exportFilename={exportFilename}
@@ -507,7 +349,7 @@ export const MermaidRenderer = memo(function MermaidRenderer({
             showCode={showCode}
             showExpandButton={showExpandButton}
             expandButtonRef={expandButtonRef}
-            expandLabel={onExpand != null ? localize('com_ui_open_as_artifact') : undefined}
+            expandLabel={undefined}
             exportSvg={processedSvg}
             exportDimensions={svgDimensions}
             exportFilename={exportFilename}

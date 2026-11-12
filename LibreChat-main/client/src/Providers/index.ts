@@ -4,7 +4,6 @@ export * from './ChatContext';
 export * from './ShareContext';
 export * from './FileMapContext';
 export * from './AddedChatContext';
-export * from './EditorContext';
 export * from './ChatFormContext';
 export * from './BookmarkContext';
 export * from './MessageContext';

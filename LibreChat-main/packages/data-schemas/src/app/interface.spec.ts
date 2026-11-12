@@ -212,30 +212,6 @@ describe('loadDefaultInterface', () => {
     expect(interfaceConfig?.buildInfo).toBe(true);
   });
 
-  it('carries a disabled artifact undocking flag to the clients', async () => {
-    const config: Partial<TCustomConfig> = {
-      interface: {
-        artifactUndocking: false,
-      },
-    };
-
-    const interfaceConfig = await loadDefaultInterface({
-      config,
-      configDefaults: getConfigDefaults(),
-    });
-
-    expect(interfaceConfig?.artifactUndocking).toBe(false);
-  });
-
-  it('uses the schema default for artifact undocking when not configured', async () => {
-    const interfaceConfig = await loadDefaultInterface({
-      config: {},
-      configDefaults: getConfigDefaults(),
-    });
-
-    expect(interfaceConfig?.artifactUndocking).toBe(true);
-  });
-
   it('carries a disabled analytics consent prompt to the clients', async () => {
     const interfaceConfig = await loadDefaultInterface({
       config: { interface: { analyticsConsent: false } },

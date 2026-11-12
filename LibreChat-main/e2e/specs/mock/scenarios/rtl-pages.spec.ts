@@ -136,6 +136,9 @@ test('a shared link mirrors its artifacts pane under RTL and its separator follo
     await reader.goto(new URL(sharedLinkUrl, baseURL).toString(), { timeout: 20_000 });
     const content = reader.locator('#share-content');
     const artifacts = reader.locator('#share-artifacts');
+    const documentRow = content.locator('[data-artifact-trigger]').first();
+    await expect(documentRow).toBeVisible({ timeout: 20_000 });
+    await documentRow.click();
     await expect(artifacts).toBeVisible({ timeout: 20_000 });
 
     /* LTR docks the pane at the inline end, on the right. */

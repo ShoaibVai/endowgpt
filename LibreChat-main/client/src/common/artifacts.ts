@@ -1,11 +1,6 @@
 import type { TGeneratedFileMetadata } from 'librechat-data-provider';
 
-export interface CodeBlock {
-  id: string;
-  language: string;
-  content: string;
-}
-
+/** Inline Mermaid blocks use the same artifact-shaped export payload. */
 export const MERMAID_ARTIFACT_TYPE = 'application/vnd.mermaid' as const;
 
 /**
@@ -40,13 +35,3 @@ export interface Artifact {
   type?: string;
   download?: ArtifactDownload;
 }
-
-export type ArtifactFiles =
-  | {
-      'App.tsx': string;
-      'index.tsx': string;
-      '/components/ui/MermaidDiagram.tsx': string;
-    }
-  | Partial<{
-      [x: string]: string | undefined;
-    }>;

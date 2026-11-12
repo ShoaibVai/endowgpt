@@ -94,33 +94,19 @@ export function buildSharedLinkStartupPayload(
   if (typeof env.ANALYTICS_GTM_ID === 'string') {
     payload.analyticsGtmId = env.ANALYTICS_GTM_ID;
   }
-  if (typeof env.SANDPACK_BUNDLER_URL === 'string') {
-    payload.bundlerURL = env.SANDPACK_BUNDLER_URL;
-  }
-  if (typeof env.SANDPACK_STATIC_BUNDLER_URL === 'string') {
-    payload.staticBundlerURL = env.SANDPACK_STATIC_BUNDLER_URL;
-  }
   if (typeof env.CUSTOM_FOOTER === 'string') {
     payload.customFooter = env.CUSTOM_FOOTER;
   }
 
-  const {
-    privacyPolicy,
-    termsOfService,
-    codeHighlightThrottleMs,
-    artifactUndocking,
-    analyticsConsent,
-  } = withSafePolicyLinks(appConfig?.interfaceConfig) ?? {};
+  const { privacyPolicy, termsOfService, codeHighlightThrottleMs, analyticsConsent } =
+    withSafePolicyLinks(appConfig?.interfaceConfig) ?? {};
   const parsedTheme = deploymentThemeSchema.safeParse(appConfig?.interfaceConfig?.theme);
   const theme = parsedTheme.success ? parsedTheme.data : undefined;
-  /* A shared conversation shows the same artifacts pane, so it needs the same
-   * answer about opening that pane in its own window. */
   if (
     privacyPolicy ||
     termsOfService ||
     codeHighlightThrottleMs != null ||
     theme ||
-    artifactUndocking === false ||
     analyticsConsent === false
   ) {
     payload.interface = {
@@ -128,7 +114,6 @@ export function buildSharedLinkStartupPayload(
       ...(privacyPolicy ? { privacyPolicy } : {}),
       ...(termsOfService ? { termsOfService } : {}),
       ...(theme ? { theme } : {}),
-      ...(artifactUndocking === false ? { artifactUndocking } : {}),
       ...(analyticsConsent === false ? { analyticsConsent } : {}),
     };
   }

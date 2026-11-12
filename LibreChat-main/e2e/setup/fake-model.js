@@ -638,8 +638,8 @@ function replyResponses(text) {
     return {
       responses: [
         [
-          ':::artifact{identifier="e2e-html" type="text/html" title="E2E HTML Artifact"}',
-          '<h1>HTML sandbox fixture</h1>',
+          ':::artifact{identifier="e2e-html" type="application/vnd.endowgpt.document" title="E2E Document Artifact"}',
+          '# Document fixture',
           ':::',
         ].join('\n'),
       ],

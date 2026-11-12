@@ -144,11 +144,11 @@ import { isFatalAgentInitializationError } from './errors';
 import { assertToolOptionsWithinLimits } from './options';
 import { hasActiveFilePolicy } from '../protection/files';
 import { resolveAgentCodeExecution } from '~/code/agent';
+import { documentsPrompt, filesPrompt } from '~/prompts';
 import { hasActiveFileFieldPolicy } from '~/protection';
 import { applyBackgroundToolCalls } from './background';
 import { admitCurrentFileBudget } from './files/budget';
 import { applyTurnDelivery } from './files/delivery';
-import { generateArtifactsPrompt } from '~/prompts';
 import { getAgentInferencePolicy } from './input';
 import { getProviderConfig } from '~/endpoints';
 import { primeResources } from './resources';
@@ -2633,13 +2633,8 @@ export async function initializeAgent(
       .join('\n\n');
   }
 
-  if (typeof agent.artifacts === 'string' && agent.artifacts !== '') {
-    const artifactsPromptResult = generateArtifactsPrompt({
-      endpoint: agent.provider,
-      artifacts: agent.artifacts as never,
-    });
-    appendAdditionalInstructions(agent, artifactsPromptResult);
-  }
+  appendAdditionalInstructions(agent, documentsPrompt);
+  appendAdditionalInstructions(agent, filesPrompt);
 
   let skillCount = 0;
   /**

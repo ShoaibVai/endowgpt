@@ -100,50 +100,6 @@ describe('isTextAttachment', () => {
   });
 });
 
-describe('artifactTypeForAttachment', () => {
-  it.each([
-    ['index.html', 'text/html'],
-    ['site.htm', 'text/html'],
-    ['App.jsx', 'application/vnd.react'],
-    ['App.tsx', 'application/vnd.react'],
-    ['notes.md', 'text/markdown'],
-    ['readme.markdown', 'text/markdown'],
-    ['flow.mmd', 'application/vnd.mermaid'],
-    ['flow.mermaid', 'application/vnd.mermaid'],
-  ])('classifies %s as %s', (filename, expected) => {
-    const attachment = baseAttachment({
-      filename,
-      text: 'content',
-    } as Partial<TAttachment>);
-    expect(artifactTypeForAttachment(attachment)).toBe(expected);
-  });
-
-  it('falls back to MIME for HTML when extension is missing', () => {
-    const attachment = baseAttachment({
-      filename: 'noext',
-      type: 'text/html',
-      text: 'content',
-    } as unknown as Partial<TAttachment>);
-    expect(artifactTypeForAttachment(attachment)).toBe('text/html');
-  });
-
-  it('returns null when there is no text content', () => {
-    const attachment = baseAttachment({ filename: 'index.html' });
-    expect(artifactTypeForAttachment(attachment)).toBeNull();
-  });
-
-  it('returns null for unsupported extensions', () => {
-    /* CSV / DOCX / XLSX / PPTX now route through the office preview
-     * buckets (rich HTML preview); use a binary type with no preview
-     * pipeline instead. */
-    const attachment = baseAttachment({
-      filename: 'photo.jpg',
-      text: undefined,
-    });
-    expect(artifactTypeForAttachment(attachment)).toBeNull();
-  });
-});
-
 describe('isInternalSandboxArtifact', () => {
   it('matches the post-sanitization `.dirkeep` form', () => {
     // The backend renames `.dirkeep` → `_.dirkeep-<hash>` via
@@ -320,29 +276,45 @@ describe('attachmentSalience', () => {
 });
 
 describe('artifactTypeForAttachment branching', () => {
-  it('returns the mermaid type for .mmd files', () => {
-    const attachment = baseAttachment({
-      filename: 'flow.mmd',
-      text: 'graph TD\nA-->B',
-    } as Partial<TAttachment>);
-    expect(artifactTypeForAttachment(attachment)).toBe(TOOL_ARTIFACT_TYPES.MERMAID);
+  it('does not surface stock artifact types for ordinary attachments', () => {
+    expect(
+      artifactTypeForAttachment(
+        baseAttachment({ filename: 'flow.mmd', text: 'graph TD\nA-->B' } as Partial<TAttachment>),
+      ),
+    ).toBeNull();
+    expect(
+      artifactTypeForAttachment(
+        baseAttachment({ filename: 'index.html', text: '<main />' } as Partial<TAttachment>),
+      ),
+    ).toBeNull();
+    expect(
+      artifactTypeForAttachment(
+        baseAttachment({
+          filename: 'App.tsx',
+          text: 'export default function App() {}',
+        } as Partial<TAttachment>),
+      ),
+    ).toBeNull();
   });
 
   it.each([
-    ['index.html', TOOL_ARTIFACT_TYPES.HTML],
-    ['App.tsx', TOOL_ARTIFACT_TYPES.REACT],
-    ['notes.md', TOOL_ARTIFACT_TYPES.MARKDOWN],
-  ])('returns the panel type for %s (not mermaid)', (filename, expected) => {
+    ['notes.md', TOOL_ARTIFACT_TYPES.MARKDOWN, { format: 'md', kind: 'document' }],
+    ['data.xlsx', TOOL_ARTIFACT_TYPES.SPREADSHEET, { format: 'xlsx', kind: 'spreadsheet' }],
+    ['slides.pptx', TOOL_ARTIFACT_TYPES.PRESENTATION, { format: 'pptx', kind: 'presentation' }],
+    ['report.docx', TOOL_ARTIFACT_TYPES.DOCX, { format: 'docx', kind: 'document' }],
+  ])('classifies a native generated %s as its viewer', (filename, expected, generated) => {
     const attachment = baseAttachment({
       filename,
       text: 'content',
+      metadata: {
+        generatedFile: { version: 1, tool: 'write_file', ...generated },
+      },
     } as Partial<TAttachment>);
-    const type = artifactTypeForAttachment(attachment);
-    expect(type).toBe(expected);
-    expect(type).not.toBe(TOOL_ARTIFACT_TYPES.MERMAID);
+
+    expect(artifactTypeForAttachment(attachment)).toBe(expected);
   });
 
-  it('returns null when there is no text', () => {
+  it('returns null without a generated-file marker', () => {
     expect(artifactTypeForAttachment(baseAttachment({ filename: 'index.html' }))).toBeNull();
   });
 });

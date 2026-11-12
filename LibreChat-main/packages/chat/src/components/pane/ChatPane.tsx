@@ -121,13 +121,13 @@ export default function ChatPane(props: ChatPaneProps): ReactElement {
           className={cn(
             'bg-surface-canvas relative z-10 w-full [view-transition-name:chat-form]',
             !isLanding && 'scrollbar-gutter-spacer',
-            isLanding && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
+            isLanding && 'max-w-[43.75rem] transition-all duration-200 xl:max-w-[47.5rem]',
           )}
         >
           {isLanding && starters}
           {readOnlyNote != null ? (
             <div
-              className="text-text-secondary mx-auto w-full max-w-3xl px-4 py-3 text-center text-sm xl:max-w-4xl"
+              className="text-text-secondary mx-auto w-full max-w-[43.75rem] px-4 py-3 text-center text-sm xl:max-w-[47.5rem]"
               role="note"
             >
               {readOnlyNote}
