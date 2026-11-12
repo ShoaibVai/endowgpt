@@ -1,0 +1,55 @@
+# PageSift configuration for endowGPT.
+#
+# Mounted read-only at /etc/pagesift/pagesift.toml and selected with
+# PAGESIFT_CONFIG. Secrets are not here: PAGESIFT_API_KEYS comes from the
+# environment.
+#
+# The Docker image bundles LightPanda, so JS rendering works without a sidecar.
+# The memory and politeness limits below are deliberately conservative for a
+# 4 vCPU / 16 GB VPS that also runs MongoDB, Meilisearch, the RAG API and
+# LibreChat.
+
+[server]
+persist_jobs = false
+
+[server.timeouts]
+header_read_secs = 15
+body_secs = 15
+upload_body_secs = 60
+request_secs = 30
+
+[server.limits]
+requests_per_minute = 120
+max_concurrent_jobs = 4
+
+[fetch]
+# Identify the deployment honestly; PageSift rejects browser-impersonating UAs.
+user_agent = "endowGPT-scraper/1.0 (+https://endowgpt.com/bot)"
+timeout_secs = 20
+max_body_mb = 15
+# SSRF: private, loopback, link-local and cloud-metadata addresses are refused.
+allow_private_network = false
+
+[policy]
+# Polite defaults for interactive scraping: one request per host every 500 ms,
+# at most two in flight per host, and a small global pool.
+interval_ms = 500
+per_host_concurrency = 2
+global_concurrency = 8
+allow_crawl_ignore_robots = false
+
+[browser]
+# The image auto-detects the bundled LightPanda binary. Keep one browser and
+# one tab so a heavy SPA cannot consume the whole container limit.
+max_browsers = 1
+max_tabs_per_browser = 1
+min_available_memory_mb = 192
+
+[itna]
+# Opt-in barrier recovery stays off: one bounded browser fallback per request
+# is not worth the complexity for interactive search.
+enabled = false
+
+[cache]
+enabled = true
+max_mb = 512
