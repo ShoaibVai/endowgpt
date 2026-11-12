@@ -239,6 +239,17 @@ function fail(message: string): never {
   throw new GeneratedFileValidationError(message);
 }
 
+function stripControlCharacters(value: string): string {
+  let result = '';
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code >= 0x20 && code !== 0x7f) {
+      result += character;
+    }
+  }
+  return result;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
@@ -372,7 +383,7 @@ function normalizeRow(
 }
 
 function normalizeSheetName(value: string, index: number, used: Set<string>): string {
-  const cleaned = value
+  const cleaned = stripControlCharacters(value)
     .replace(SHEET_NAME_INVALID_CHARACTERS, '_')
     .replace(/^'+|'+$/g, '')
     .trim();
