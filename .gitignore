@@ -28,20 +28,29 @@ setup-guide.md
 FINAL_REPORT.md
 
 # --- Runtime / data volumes ---
-data-node/
-meili_data*
-pgdata*
-vectors/
-uploads/
-images/
-logs/
-skill/
+# Anchored to the repository root on purpose: an unanchored `images/` also
+# matched LibreChat-main/packages/api/src/images/, which is source and is
+# imported by packages/api/src/index.ts. Unanchored patterns here break the
+# image build on a fresh clone.
+/data-node/
+/meili_data*
+/pgdata*
+/vectors/
+/uploads/
+/images/
+/logs/
+/skill/
 LibreChat-main/data-node/
 LibreChat-main/meili_data*/
 LibreChat-main/uploads/
 LibreChat-main/images/
 LibreChat-main/logs/
 LibreChat-main/skill/
+
+# Source directories that merely share a runtime directory name.
+# Without these the Docker build fails: `Could not resolve './images'`.
+!LibreChat-main/packages/api/src/images/
+!LibreChat-main/api/server/services/Files/images/
 LibreChat-main/client/public/images/*
 !LibreChat-main/client/public/images/.gitkeep
 LibreChat-main/client/public/fonts/
