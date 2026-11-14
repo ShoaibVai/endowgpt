@@ -8,6 +8,7 @@ import type {
 import type { SuperAdminMethods } from '@librechat/data-schemas';
 import type { AddressInfo } from 'node:net';
 import { createSuperAdminRouter } from './routes';
+import type { SuperAdminUserMethods } from './users';
 
 /** HTTP contract for `/api/superadmin`: query validation, pagination, and
  *  coded failures. Storage semantics are covered by data-schemas'
@@ -154,13 +155,22 @@ async function startApp(methods: SuperAdminMethods): Promise<{
   baseUrl: string;
   close: () => Promise<void>;
 }> {
+  /** The user-management routes are exercised in `users.spec.ts`; this suite
+   *  covers the read-only portal. */
+  const userMethods: SuperAdminUserMethods = {
+    findUser: async () => null,
+    countUsers: async () => 0,
+    updateUser: async () => null,
+    createUser: async () => ({}),
+    hashPassword: async () => 'hashed',
+  };
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     Object.assign(req, { user: { id: 'admin', tenantId: 'tenant-a' } });
     next();
   });
-  app.use('/api/superadmin', createSuperAdminRouter({ methods }));
+  app.use('/api/superadmin', createSuperAdminRouter({ methods, users: userMethods }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>((resolve) => server.once('listening', resolve));
   const { port } = server.address() as AddressInfo;

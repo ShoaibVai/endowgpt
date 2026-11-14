@@ -592,6 +592,8 @@ export const superAdmin = () => `${BASE_URL}/api/superadmin`;
 export const superAdminAccess = () => `${superAdmin()}/access`;
 export const superAdminOverview = () => `${superAdmin()}/overview`;
 export const superAdminUsers = () => `${superAdmin()}/users`;
+export const superAdminUserRole = (userId: string) =>
+  `${superAdminUsers()}/${encodeURIComponent(userId)}/role`;
 export const superAdminUserConversations = (userId: string) =>
   `${superAdminUsers()}/${encodeURIComponent(userId)}/conversations`;
 export const superAdminConversationMessages = (conversationId: string) =>

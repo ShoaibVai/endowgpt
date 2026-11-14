@@ -47,7 +47,8 @@ export const {
   aiEditDocument,
 } = documents;
 
-/** endowGPT superadmin portal reads (no mutations by design). */
+/** endowGPT superadmin portal. Reads are capability-gated; the only writes are
+ *  user creation and role changes, both behind `manage:users`. */
 export const {
   getSuperAdminAccess,
   getSuperAdminOverview,
@@ -57,6 +58,8 @@ export const {
   getSuperAdminDocuments,
   getSuperAdminDocument,
   getSuperAdminAudit,
+  createSuperAdminUser,
+  updateSuperAdminUserRole,
 } = superadmin;
 
 export function getInsights(params: TInsightsParams = {}): Promise<TInsightsResponse> {

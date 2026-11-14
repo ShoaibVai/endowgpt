@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SystemRoles } from './roles';
 import * as endpoints from './api-endpoints';
 import request from './request';
 
@@ -108,6 +109,55 @@ export const superAdminUsersResponseSchema = z.object({
 });
 
 export type TSuperAdminUsersResponse = z.infer<typeof superAdminUsersResponseSchema>;
+
+/* ------------------------------------------------------------ user management */
+
+/**
+ * The only roles this deployment assigns through the portal. The server rejects
+ * anything outside this list rather than accepting an arbitrary role string.
+ */
+export const SUPER_ADMIN_MANAGED_ROLES = [SystemRoles.ADMIN, SystemRoles.USER] as const;
+
+export type TSuperAdminManagedRole = (typeof SUPER_ADMIN_MANAGED_ROLES)[number];
+
+export const SUPER_ADMIN_PASSWORD_MIN_LENGTH = 8;
+export const SUPER_ADMIN_PASSWORD_MAX_LENGTH = 128;
+export const SUPER_ADMIN_NAME_MAX_LENGTH = 80;
+export const SUPER_ADMIN_EMAIL_MAX_LENGTH = 254;
+
+export const superAdminManagedRoleSchema = z.enum([SystemRoles.ADMIN, SystemRoles.USER]);
+
+export const superAdminCreateUserSchema = z.object({
+  name: z.string().trim().min(1).max(SUPER_ADMIN_NAME_MAX_LENGTH),
+  email: z.string().trim().email().max(SUPER_ADMIN_EMAIL_MAX_LENGTH),
+  password: z.string().min(SUPER_ADMIN_PASSWORD_MIN_LENGTH).max(SUPER_ADMIN_PASSWORD_MAX_LENGTH),
+  role: superAdminManagedRoleSchema,
+});
+
+export type TSuperAdminCreateUserRequest = z.infer<typeof superAdminCreateUserSchema>;
+
+export const superAdminUpdateRoleSchema = z.object({
+  role: superAdminManagedRoleSchema,
+});
+
+export type TSuperAdminUpdateRoleRequest = z.infer<typeof superAdminUpdateRoleSchema>;
+
+/** The write endpoints answer with the account they changed, never its credentials. */
+export const superAdminManagedUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.string(),
+  createdAt: z.string().nullable(),
+});
+
+export type TSuperAdminManagedUser = z.infer<typeof superAdminManagedUserSchema>;
+
+export const superAdminManagedUserResponseSchema = z.object({
+  user: superAdminManagedUserSchema,
+});
+
+export type TSuperAdminManagedUserResponse = z.infer<typeof superAdminManagedUserResponseSchema>;
 
 export const superAdminConversationSchema = z.object({
   conversationId: z.string(),
@@ -291,6 +341,19 @@ export function getSuperAdminUsers(
   params: TSuperAdminUsersParams = {},
 ): Promise<TSuperAdminUsersResponse> {
   return request.get(`${endpoints.superAdminUsers()}${querySuffix(params)}`);
+}
+
+export function createSuperAdminUser(
+  body: TSuperAdminCreateUserRequest,
+): Promise<TSuperAdminManagedUserResponse> {
+  return request.post(endpoints.superAdminUsers(), body);
+}
+
+export function updateSuperAdminUserRole(
+  userId: string,
+  body: TSuperAdminUpdateRoleRequest,
+): Promise<TSuperAdminManagedUserResponse> {
+  return request.patch(endpoints.superAdminUserRole(userId), body);
 }
 
 export function getSuperAdminConversations(

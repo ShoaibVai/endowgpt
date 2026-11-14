@@ -14,6 +14,7 @@ import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import useDrawerViewport from '~/hooks/Nav/useDrawerViewport';
 import ChatHistory from './ChatHistory';
 import Documents from './Documents';
+import Users from './Users';
 import Audit from './Audit';
 import {
   DailyUsageTable,
@@ -28,7 +29,7 @@ import { formatNumber } from './format';
 const USERS_PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 350;
 
-type PortalTab = 'overview' | 'users' | 'documents' | 'audit';
+type PortalTab = 'overview' | 'manage' | 'users' | 'documents' | 'audit';
 
 const ranges: Array<{ value: TSuperAdminRange; labelKey: TranslationKeys }> = [
   { value: '24h', labelKey: 'com_superadmin_range_24_hours' },
@@ -39,6 +40,7 @@ const ranges: Array<{ value: TSuperAdminRange; labelKey: TranslationKeys }> = [
 
 const tabs: Array<{ value: PortalTab; labelKey: TranslationKeys }> = [
   { value: 'overview', labelKey: 'com_superadmin_tab_overview' },
+  { value: 'manage', labelKey: 'com_superadmin_tab_manage_users' },
   { value: 'users', labelKey: 'com_superadmin_tab_users' },
   { value: 'documents', labelKey: 'com_superadmin_tab_documents' },
   { value: 'audit', labelKey: 'com_superadmin_tab_audit' },
@@ -298,6 +300,10 @@ export default function SuperAdminView() {
                 </>
               )}
             </>
+          )}
+
+          {activeTab === 'manage' && (
+            <Users enabled={enabled} localize={localize} locale={locale} />
           )}
 
           {activeTab === 'users' && (

@@ -12,8 +12,10 @@ import type {
   TSuperAdminUsersResponse,
 } from 'librechat-data-provider';
 import type { SuperAdminMethods } from '@librechat/data-schemas';
-import type { Request, Response, Router } from 'express';
+import type { Request, Response, Router, RequestHandler } from 'express';
 import { getSafeErrorMetadata } from '~/utils/errors';
+import { createSuperAdminUserHandlers } from './users';
+import type { SuperAdminUserMethods } from './users';
 
 /** endowGPT superadmin portal: deployment-wide, read-only token usage and
  *  chat history. The CJS wiring in `api/server/routes/superadmin.js` mounts
@@ -21,6 +23,10 @@ import { getSafeErrorMetadata } from '~/utils/errors';
 
 export interface SuperAdminRouterDeps {
   methods: SuperAdminMethods;
+  /** User management backing store, injected so this module stays storage-agnostic. */
+  users: SuperAdminUserMethods;
+  /** `manage:users` gate for the write routes; omitted only in unit tests. */
+  requireManageUsers?: RequestHandler;
 }
 
 type SuperAdminRequest = Request & {
@@ -69,8 +75,14 @@ function queryOf(req: SuperAdminRequest) {
   return superAdminQuerySchema.safeParse(req.query ?? {});
 }
 
-export function createSuperAdminRouter({ methods }: SuperAdminRouterDeps): Router {
+export function createSuperAdminRouter({
+  methods,
+  users,
+  requireManageUsers,
+}: SuperAdminRouterDeps): Router {
   const router = ExpressRouter();
+  const userHandlers = createSuperAdminUserHandlers(users);
+  const manageUsers: RequestHandler[] = requireManageUsers ? [requireManageUsers] : [];
 
   router.get('/access', (_req: SuperAdminRequest, res: Response<TSuperAdminAccess>) => {
     /** Reaching this handler proves the router's `requireCapability` gate passed. */
@@ -124,6 +136,14 @@ export function createSuperAdminRouter({ methods }: SuperAdminRouterDeps): Route
       return void res.status(500).json({ error: 'superadmin_users_failed' });
     }
   });
+
+  router.post('/users', ...manageUsers, (req, res) => void userHandlers.createUser(req, res));
+
+  router.patch(
+    '/users/:userId/role',
+    ...manageUsers,
+    (req, res) => void userHandlers.updateUserRole(req, res),
+  );
 
   router.get('/users/:userId/conversations', async (req: SuperAdminRequest, res: Response) => {
     const parsed = queryOf(req);
