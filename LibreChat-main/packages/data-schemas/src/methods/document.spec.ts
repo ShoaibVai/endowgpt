@@ -1,16 +1,18 @@
 import mongoose from 'mongoose';
 import { logger, createModels } from '..';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { createDocumentMethods } from './document';
 import type { DocumentMethods } from './document';
+import { createDocumentMethods } from './document';
 
 /** Storage contract for the document editor (PLAN.md §7, §10): one row per
- *  (user, conversation, artifact), rolling snapshots on every write, conflict
- *  detection on a stale base, and restores that append instead of rewriting. */
+ *  (user, conversation, artifact), rolling snapshots in their own collection,
+ *  conflict detection on a stale base, and restores that append instead of
+ *  rewriting. */
 
 logger.silent = true;
 
-let Document: mongoose.Model<unknown>;
+let Document: mongoose.Model<Record<string, unknown>>;
+let DocumentVersion: mongoose.Model<Record<string, unknown>>;
 let methods: DocumentMethods;
 let mongoServer: MongoMemoryServer;
 
@@ -29,7 +31,8 @@ beforeAll(async () => {
   await mongoose.connect(mongoServer.getUri());
   createModels(mongoose);
   Document = mongoose.models.Document;
-  await Document.syncIndexes();
+  DocumentVersion = mongoose.models.DocumentVersion;
+  await Promise.all([Document.syncIndexes(), DocumentVersion.syncIndexes()]);
   methods = createDocumentMethods(mongoose);
 });
 
@@ -39,7 +42,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await Document.deleteMany({});
+  await Promise.all([Document.deleteMany({}), DocumentVersion.deleteMany({})]);
 });
 
 describe('upsertDocument', () => {
@@ -51,14 +54,26 @@ describe('upsertDocument', () => {
       return;
     }
     expect(result.document.content).toBe('# Version 1');
-    expect(result.document.versions).toHaveLength(1);
-    expect(result.document.versions?.[0]).toMatchObject({
-      title: 'Draft',
-      content: '# Version 1',
-      source: 'user',
-    });
-    expect(result.document.lastVersionId).toBe(result.document.versions?.[0]?.id);
+    expect(result.document.contentBytes).toBe(Buffer.byteLength('# Version 1'));
+    expect(result.document.versionCount).toBe(1);
     expect(await Document.countDocuments({ user: userA })).toBe(1);
+
+    const versions = await methods.getDocumentVersions({
+      userId: userA,
+      conversationId: base.conversationId,
+      artifactId: base.artifactId,
+    });
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toMatchObject({ title: 'Draft' });
+    expect(result.document.lastVersionId).toBe(versions[0]?.id);
+    expect(
+      await methods.getDocumentVersion({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+        versionId: versions[0]?.id ?? '',
+      }),
+    ).toMatchObject({ content: '# Version 1', source: 'user' });
   });
 
   test('appends a snapshot when the caller saw the current version', async () => {
@@ -81,14 +96,24 @@ describe('upsertDocument', () => {
     if (!second.ok) {
       return;
     }
-    expect(second.document.versions).toHaveLength(2);
-    expect(second.document.versions?.[1]).toMatchObject({
-      title: 'Draft two',
-      content: '# Version 2',
-      source: 'ai_edit',
-    });
-    expect(second.document.lastVersionId).toBe(second.document.versions?.[1]?.id);
+    expect(second.document.versionCount).toBe(2);
     expect(second.document.lastVersionId).not.toBe(first.document.lastVersionId);
+
+    const versions = await methods.getDocumentVersions({
+      userId: userA,
+      conversationId: base.conversationId,
+      artifactId: base.artifactId,
+    });
+    expect(versions).toHaveLength(2);
+    expect(versions[1]).toMatchObject({ title: 'Draft two', source: 'ai_edit' });
+    expect(
+      await methods.getDocumentVersion({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+        versionId: versions[1]?.id ?? '',
+      }),
+    ).toMatchObject({ content: '# Version 2' });
   });
 
   test('routes a stale baseVersionId to a conflict without touching the row', async () => {
@@ -107,7 +132,13 @@ describe('upsertDocument', () => {
     }
     expect(stale.code).toBe('conflict');
     expect(stale.document.content).toBe('# Version 1');
-    expect(stale.document.versions).toHaveLength(1);
+    expect(
+      await methods.getDocumentVersions({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+      }),
+    ).toHaveLength(1);
   });
 
   test('prunes the oldest snapshots beyond versionHistoryCap', async () => {
@@ -137,21 +168,56 @@ describe('upsertDocument', () => {
     if (!third.ok) {
       return;
     }
-    expect(third.document.versions).toHaveLength(2);
-    expect(third.document.versions?.map((version) => version.content)).toEqual([
-      '# Version 2',
-      '# Version 3',
-    ]);
+    expect(third.document.versionCount).toBe(2);
+    const versions = await methods.getDocumentVersions({
+      userId: userA,
+      conversationId: base.conversationId,
+      artifactId: base.artifactId,
+    });
+    expect(versions).toHaveLength(2);
+    const contents = await Promise.all(
+      versions.map((version) =>
+        methods.getDocumentVersion({
+          userId: userA,
+          conversationId: base.conversationId,
+          artifactId: base.artifactId,
+          versionId: version.id,
+        }),
+      ),
+    );
+    expect(contents.map((version) => version?.content)).toEqual(['# Version 2', '# Version 3']);
+  });
+
+  test('detects a conflict from the caller-supplied current row', async () => {
+    const created = await methods.upsertDocument({ userId: userA, ...base });
+    if (!created.ok) {
+      throw new Error('seed failed');
+    }
+
+    const stale = await methods.upsertDocument({
+      userId: userA,
+      ...base,
+      content: '# Stale write',
+      baseVersionId: 'another-session',
+      existing: created.document,
+    });
+
+    expect(stale.ok).toBe(false);
+    if (stale.ok) {
+      return;
+    }
+    expect(stale.code).toBe('conflict');
+    expect(stale.document.content).toBe('# Version 1');
   });
 });
 
-describe('getDocument and getDocumentVersion', () => {
+describe('version history', () => {
   test('reads a snapshot by id and returns null for an unknown id', async () => {
     const created = await methods.upsertDocument({ userId: userA, ...base });
     if (!created.ok) {
       throw new Error('seed failed');
     }
-    const versionId = created.document.versions?.[0]?.id ?? '';
+    const versionId = created.document.lastVersionId ?? '';
 
     const found = await methods.getDocumentVersion({
       userId: userA,
@@ -170,6 +236,65 @@ describe('getDocument and getDocumentVersion', () => {
     expect(missing).toBeNull();
   });
 
+  test('reads and migrates snapshots embedded before the collection split', async () => {
+    await Document.collection.insertOne({
+      user: new mongoose.Types.ObjectId(userA),
+      conversationId: base.conversationId,
+      artifactId: base.artifactId,
+      title: base.title,
+      content: '# Legacy current',
+      versions: [
+        { id: 'legacy-1', title: 'Draft', content: '# Legacy', createdAt: 5, source: 'user' },
+      ],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    expect(
+      await methods.getDocumentVersions({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+      }),
+    ).toMatchObject([{ id: 'legacy-1', title: 'Draft' }]);
+    expect(
+      await methods.getDocumentVersion({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+        versionId: 'legacy-1',
+      }),
+    ).toMatchObject({ content: '# Legacy' });
+
+    const written = await methods.upsertDocument({
+      userId: userA,
+      ...base,
+      content: '# New current',
+    });
+    expect(written.ok).toBe(true);
+    if (!written.ok) {
+      return;
+    }
+    expect(written.document.versionCount).toBe(2);
+    const ids = (
+      await methods.getDocumentVersions({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+      })
+    ).map((version) => version.id);
+    expect(ids).toEqual(['legacy-1', written.document.lastVersionId]);
+
+    const raw = await Document.findOne({
+      user: userA,
+      conversationId: base.conversationId,
+      artifactId: base.artifactId,
+    })
+      .select('versions')
+      .lean<{ versions?: unknown[] }>();
+    expect(raw?.versions).toBeUndefined();
+  });
+
   test('scopes reads to the owning user', async () => {
     await methods.upsertDocument({ userId: userA, ...base });
 
@@ -180,6 +305,13 @@ describe('getDocument and getDocumentVersion', () => {
         artifactId: base.artifactId,
       }),
     ).toBeNull();
+    expect(
+      await methods.getDocumentVersions({
+        userId: userB,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -200,11 +332,19 @@ describe('restoreDocumentVersion', () => {
       throw new Error('seed failed');
     }
 
+    const firstVersionId = (
+      await methods.getDocumentVersions({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+      })
+    )[0]?.id;
+
     const restored = await methods.restoreDocumentVersion({
       userId: userA,
       conversationId: base.conversationId,
       artifactId: base.artifactId,
-      versionId: second.document.versions?.[0]?.id ?? '',
+      versionId: firstVersionId ?? '',
     });
 
     expect(restored.ok).toBe(true);
@@ -213,16 +353,32 @@ describe('restoreDocumentVersion', () => {
     }
     expect(restored.document.title).toBe('Draft');
     expect(restored.document.content).toBe('# Version 1');
-    expect(restored.document.versions).toHaveLength(4);
-    expect(restored.document.versions?.[2]).toMatchObject({
-      content: '# Version 2',
-      source: 'restore',
+    expect(restored.document.versionCount).toBe(4);
+
+    const versions = await methods.getDocumentVersions({
+      userId: userA,
+      conversationId: base.conversationId,
+      artifactId: base.artifactId,
     });
-    expect(restored.document.versions?.[3]).toMatchObject({
-      content: '# Version 1',
-      source: 'restore',
-    });
-    expect(restored.document.lastVersionId).toBe(restored.document.versions?.[3]?.id);
+    expect(versions).toHaveLength(4);
+    expect(versions[2]).toMatchObject({ source: 'restore' });
+    expect(
+      await methods.getDocumentVersion({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+        versionId: versions[2]?.id ?? '',
+      }),
+    ).toMatchObject({ content: '# Version 2', source: 'restore' });
+    expect(
+      await methods.getDocumentVersion({
+        userId: userA,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+        versionId: versions[3]?.id ?? '',
+      }),
+    ).toMatchObject({ content: '# Version 1', source: 'restore' });
+    expect(restored.document.lastVersionId).toBe(versions[3]?.id);
   });
 
   test('returns not_found for an unknown version', async () => {
@@ -264,9 +420,10 @@ describe('listing and deletion', () => {
       versionCount: 1,
     });
     expect(firstItem?.updatedAt).toBeGreaterThan(0);
+    expect(await methods.getDocuments('not-an-object-id')).toEqual([]);
   });
 
-  test('deleteDocument is user scoped and deleteUserDocuments erases the account rows', async () => {
+  test('deleteDocument is user scoped and erases the snapshots it owned', async () => {
     await methods.upsertDocument({ userId: userA, ...base });
     await methods.upsertDocument({ userId: userB, ...base });
 
@@ -284,8 +441,20 @@ describe('listing and deletion', () => {
         artifactId: base.artifactId,
       }),
     ).not.toBeNull();
+    expect(
+      await methods.getDocumentVersions({
+        userId: userB,
+        conversationId: base.conversationId,
+        artifactId: base.artifactId,
+      }),
+    ).toEqual([]);
+  });
 
-    expect(await methods.deleteUserDocuments(userA)).toBe(1);
+  test('deleteUserDocuments erases the account rows and snapshots', async () => {
+    await methods.upsertDocument({ userId: userA, ...base });
+    await methods.upsertDocument({ userId: userA, ...base, artifactId: 'artifact-2' });
+
+    expect(await methods.deleteUserDocuments(userA)).toBe(2);
     expect(
       await methods.getDocument({
         userId: userA,
@@ -293,5 +462,6 @@ describe('listing and deletion', () => {
         artifactId: base.artifactId,
       }),
     ).toBeNull();
+    expect(await DocumentVersion.countDocuments({ user: userA })).toBe(0);
   });
 });

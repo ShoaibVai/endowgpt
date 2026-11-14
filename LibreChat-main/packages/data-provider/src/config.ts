@@ -4451,6 +4451,14 @@ export const documentsConfigSchema = z.object({
   versionHistoryCap: z.number().int().min(3).max(500).default(50),
   /** Client autosave debounce in milliseconds. */
   autosaveDelayMs: z.number().int().min(200).max(10_000).default(800),
+  /** Per-user cap across saved documents and generated files, in bytes.
+   *  The default is 100 MB; deployments can retune it in `librechat.yaml`. */
+  storageMaxBytes: z
+    .number()
+    .int()
+    .min(1_048_576)
+    .max(1_073_741_824)
+    .default(104_857_600),
   /** Models the inline selection edits may invoke. Requests with any other
    *  model are rejected before they leave the deployment. */
   allowedAiEditModels: z.array(z.string()).default(['deepseek-v4.1-flash-free']),

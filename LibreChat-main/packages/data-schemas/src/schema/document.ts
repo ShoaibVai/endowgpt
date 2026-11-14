@@ -1,10 +1,9 @@
 import { Schema } from 'mongoose';
-import type { IDocument, IDocumentVersion } from '~/types/document';
+import type { IDocument } from '~/types/document';
 
 /** One endowGPT document artifact, per (user, conversationId, artifactId).
- *  The canonical Markdown lives in `content`; `versions` carries rolling
- *  snapshots for the editor's history drawer, capped by
- *  `documents.versionHistoryCap` (service responsibility, not the schema's). */
+ *  The canonical Markdown lives in `content`; snapshots live in the
+ *  `documentversions` collection so a save never rewrites history. */
 const documentSchema: Schema<IDocument> = new Schema(
   {
     user: {
@@ -33,6 +32,19 @@ const documentSchema: Schema<IDocument> = new Schema(
     lastVersionId: {
       type: String,
     },
+    /** Snapshot count, kept in step by the writer so the list needs no join. */
+    versionCount: {
+      type: Number,
+      default: 0,
+    },
+    /** UTF-8 length of `content`; lets quota accounting and deletes avoid
+     *  re-reading the body. */
+    contentBytes: {
+      type: Number,
+    },
+    /** Embedded snapshots written before the `documentversions` split. Read
+     *  only: the writer imports them and unsets the field on the next save.
+     *  `select: false` keeps the bodies out of ordinary reads. */
     versions: {
       type: [
         {
@@ -45,6 +57,7 @@ const documentSchema: Schema<IDocument> = new Schema(
         },
       ],
       default: undefined,
+      select: false,
     },
     tenantId: {
       type: String,
@@ -61,18 +74,5 @@ const documentSchema: Schema<IDocument> = new Schema(
 documentSchema.index({ user: 1, conversationId: 1, artifactId: 1 }, { unique: true });
 /** Recent documents first for the /documents list and the editor lookup. */
 documentSchema.index({ user: 1, updatedAt: -1 });
-
-/**
- * Rolling snapshots: ordered oldest→newest is safe because the writer
- * (DocumentService) controls pruning and pass-through bounds; `lastVersionId`
- * marks the newest for conflict checks, so a plain rename cannot crash the
- * version list that the drawer shows.
- */
-documentSchema.virtual('newestVersion').get(function (this: IDocument) {
-  const versions = this.versions ?? [];
-  return versions.length > 0
-    ? versions[versions.length - 1]
-    : (undefined as IDocumentVersion | undefined);
-});
 
 export default documentSchema;

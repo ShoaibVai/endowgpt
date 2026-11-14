@@ -18,9 +18,11 @@ import * as permissions from './accessPermissions';
 import { setClientLimits } from './clientLimits';
 import * as endpoints from './api-endpoints';
 import { uploadEventStream } from './upload';
+import * as superadmin from './superadmin';
 import * as mcp from './types/mcpServers';
 import * as qt from './types/queuedTurns';
 import * as sch from './types/schedules';
+import * as documents from './documents';
 import * as a from './types/assistants';
 import * as m from './types/mutations';
 import * as ag from './types/agents';
@@ -28,17 +30,16 @@ import * as q from './types/queries';
 import * as sk from './types/skills';
 import * as f from './types/files';
 import * as config from './config';
-import * as superadmin from './superadmin';
 import request from './request';
 import * as s from './schemas';
 import * as r from './roles';
-import * as documents from './documents';
 
 /** endowGPT document artifact endpoints ride the same service object so the
  *  client's `dataService.getDocuments`-style surface stays single. */
 export const {
   getDocuments,
   getDocument,
+  getDocumentStorage,
   upsertDocument,
   deleteDocument,
   getDocumentVersion,
@@ -53,6 +54,9 @@ export const {
   getSuperAdminUsers,
   getSuperAdminConversations,
   getSuperAdminMessages,
+  getSuperAdminDocuments,
+  getSuperAdminDocument,
+  getSuperAdminAudit,
 } = superadmin;
 
 export function getInsights(params: TInsightsParams = {}): Promise<TInsightsResponse> {

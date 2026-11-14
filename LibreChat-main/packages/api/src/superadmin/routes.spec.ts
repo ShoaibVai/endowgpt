@@ -1,12 +1,12 @@
 import express from 'express';
-import type { SuperAdminMethods } from '@librechat/data-schemas';
-import type { AddressInfo } from 'node:net';
 import type {
   TSuperAdminConversationsResponse,
   TSuperAdminMessagesResponse,
   TSuperAdminOverview,
   TSuperAdminUsersResponse,
 } from 'librechat-data-provider';
+import type { SuperAdminMethods } from '@librechat/data-schemas';
+import type { AddressInfo } from 'node:net';
 import { createSuperAdminRouter } from './routes';
 
 /** HTTP contract for `/api/superadmin`: query validation, pagination, and
@@ -14,6 +14,8 @@ import { createSuperAdminRouter } from './routes';
  *  `superadmin.spec.ts`; here the router is exercised with stub methods. */
 
 const CREATED = '2026-01-01T00:00:00.000Z';
+/** A real-shaped owner id: the router rejects anything that is not an ObjectId. */
+const USER_ID = '64b000000000000000000001';
 
 const overview: TSuperAdminOverview = {
   totals: {
@@ -109,6 +111,18 @@ const messages: TSuperAdminMessagesResponse = {
   pages: 1,
 };
 
+const documents = {
+  userId: 'user-a',
+  userName: 'Alice',
+  userEmail: 'alice@example.com',
+  conversationId: 'convo-1',
+  artifactId: 'artifact-1',
+  title: 'Project note',
+  versionCount: 2,
+  createdAt: CREATED,
+  updatedAt: CREATED,
+};
+
 function methodStubs() {
   return {
     getSuperAdminOverview: jest.fn(async () => overview),
@@ -123,6 +137,15 @@ function methodStubs() {
     getSuperAdminMessages: jest.fn(async () => ({
       messages: messages.messages,
       total: messages.total,
+    })),
+    getSuperAdminDocuments: jest.fn(async () => ({
+      documents: [documents],
+      total: 1,
+    })),
+    getSuperAdminDocument: jest.fn(async () => ({
+      ...documents,
+      content: '# Note',
+      versions: [{ id: 'v1', title: 'Project note', createdAt: 1, source: 'user' }],
     })),
   };
 }
@@ -196,6 +219,17 @@ describe('GET /api/superadmin', () => {
     }
   });
 
+  test('rejects a page beyond the portal bound', async () => {
+    const app = await startApp(methodStubs() as unknown as SuperAdminMethods);
+    try {
+      const response = await fetch(`${app.baseUrl}/users?page=100000`);
+      expect(response.status).toBe(400);
+      expect(await readJson(response)).toEqual({ error: 'invalid_query' });
+    } finally {
+      await app.close();
+    }
+  });
+
   test('normalizes search and applies page defaults', async () => {
     const methods = methodStubs();
     const app = await startApp(methods as unknown as SuperAdminMethods);
@@ -222,12 +256,63 @@ describe('GET /api/superadmin', () => {
     const methods = methodStubs();
     const app = await startApp(methods as unknown as SuperAdminMethods);
     try {
-      const response = await fetch(`${app.baseUrl}/users/user-a/conversations?range=30d`);
+      const response = await fetch(`${app.baseUrl}/users/${USER_ID}/conversations?range=30d`);
       expect(response.status).toBe(200);
       expect(await readJson(response)).toEqual(conversations);
       expect(methods.getSuperAdminConversations).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'user-a', tenantId: 'tenant-a', page: 1, pageSize: 25 }),
+        expect.objectContaining({ userId: USER_ID, tenantId: 'tenant-a', page: 1, pageSize: 25 }),
       );
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('returns documents and their full content', async () => {
+    const methods = methodStubs();
+    const app = await startApp(methods as unknown as SuperAdminMethods);
+    try {
+      const list = await fetch(`${app.baseUrl}/documents?range=30d`);
+      expect(list.status).toBe(200);
+      const body = (await readJson(list)) as unknown as Record<string, unknown>;
+      expect(body).toMatchObject({ page: 1, pageSize: 25, total: 1, pages: 1 });
+      expect((body.documents as Array<Record<string, unknown>>)[0]).toMatchObject({
+        artifactId: 'artifact-1',
+      });
+
+      const detail = await fetch(`${app.baseUrl}/documents/user-a/convo-1/artifact-1`);
+      expect(detail.status).toBe(200);
+      expect(await readJson(detail)).toMatchObject({ content: '# Note', title: 'Project note' });
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('rejects a malformed owner id instead of widening the query', async () => {
+    const methods = methodStubs();
+    const app = await startApp(methods as unknown as SuperAdminMethods);
+    try {
+      const docs = await fetch(`${app.baseUrl}/documents?userId=not-an-id`);
+      expect(docs.status).toBe(400);
+      expect(await readJson(docs)).toEqual({ error: 'invalid_user' });
+      expect(methods.getSuperAdminDocuments).not.toHaveBeenCalled();
+
+      const convos = await fetch(`${app.baseUrl}/users/not-an-id/conversations`);
+      expect(convos.status).toBe(400);
+      expect(await readJson(convos)).toEqual({ error: 'invalid_user' });
+      expect(methods.getSuperAdminConversations).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('maps a missing document to 404', async () => {
+    const methods = methodStubs();
+    methods.getSuperAdminDocument.mockResolvedValueOnce(null as never);
+    const app = await startApp(methods as unknown as SuperAdminMethods);
+    try {
+      const response = await fetch(`${app.baseUrl}/documents/user-a/convo-1/missing`);
+      expect(response.status).toBe(404);
+      expect(await readJson(response)).toEqual({ error: 'document_not_found' });
     } finally {
       await app.close();
     }
@@ -241,11 +326,13 @@ describe('GET /api/superadmin', () => {
       expect(missingOwner.status).toBe(400);
       expect(await readJson(missingOwner)).toEqual({ error: 'invalid_conversation' });
 
-      const response = await fetch(`${app.baseUrl}/conversations/convo-1/messages?userId=user-a`);
+      const response = await fetch(
+        `${app.baseUrl}/conversations/convo-1/messages?userId=${USER_ID}`,
+      );
       expect(response.status).toBe(200);
       expect(await readJson(response)).toEqual(messages);
       expect(methods.getSuperAdminMessages).toHaveBeenCalledWith(
-        expect.objectContaining({ conversationId: 'convo-1', userId: 'user-a' }),
+        expect.objectContaining({ conversationId: 'convo-1', userId: USER_ID }),
       );
     } finally {
       await app.close();
@@ -257,7 +344,9 @@ describe('GET /api/superadmin', () => {
     methods.getSuperAdminMessages.mockResolvedValueOnce(null as never);
     const app = await startApp(methods as unknown as SuperAdminMethods);
     try {
-      const missing = await fetch(`${app.baseUrl}/conversations/convo-1/messages?userId=user-a`);
+      const missing = await fetch(
+        `${app.baseUrl}/conversations/convo-1/messages?userId=${USER_ID}`,
+      );
       expect(missing.status).toBe(404);
       expect(await readJson(missing)).toEqual({ error: 'conversation_not_found' });
 

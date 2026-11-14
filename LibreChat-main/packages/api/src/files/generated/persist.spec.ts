@@ -1,7 +1,7 @@
 import { FileContext } from 'librechat-data-provider';
+import type { GeneratedFileRecord } from './persist';
 import { DEFAULT_GENERATED_FILE_LIMITS } from './limits';
 import { persistGeneratedFile } from './persist';
-import type { GeneratedFileRecord } from './persist';
 
 const limits = DEFAULT_GENERATED_FILE_LIMITS;
 
@@ -17,6 +17,7 @@ function makeDeps(overrides: Partial<Parameters<typeof persistGeneratedFile>[1]>
         records.push(record);
         return record;
       }),
+      getUserStorageUsage: jest.fn(async () => ({ usedBytes: 0 })),
       deleteStored: jest.fn(async () => undefined),
       expiredAt: new Date('2027-01-01T00:00:00Z'),
       logger: { error: jest.fn() },
@@ -172,5 +173,67 @@ describe('persistGeneratedFile', () => {
       ),
     ).rejects.toThrow(/byte limit/);
     expect(deps.saveBuffer).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file that would exceed the user storage cap before touching storage', async () => {
+    const { deps } = makeDeps({
+      getUserStorageUsage: jest.fn(async () => ({ usedBytes: 1 })),
+    });
+    await expect(
+      persistGeneratedFile(
+        {
+          req,
+          buffer: Buffer.from('bytes'),
+          filename: 'Students.xlsx',
+          format: 'xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          counts: {
+            version: 1,
+            tool: 'create_spreadsheet',
+            kind: 'spreadsheet',
+            format: 'xlsx',
+            sheets: 1,
+            rows: 1,
+          },
+          limits,
+          storageMaxBytes: 4,
+        },
+        deps,
+      ),
+    ).rejects.toMatchObject({ code: 'storage_quota_exceeded' });
+    expect(deps.getUserStorageUsage).toHaveBeenCalledWith({
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+    });
+    expect(deps.saveBuffer).not.toHaveBeenCalled();
+  });
+
+  it('stores a file that fits under the user storage cap', async () => {
+    const { deps } = makeDeps({
+      getUserStorageUsage: jest.fn(async () => ({ usedBytes: 3 })),
+    });
+    await expect(
+      persistGeneratedFile(
+        {
+          req,
+          buffer: Buffer.from('bytes'),
+          filename: 'Students.xlsx',
+          format: 'xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          counts: {
+            version: 1,
+            tool: 'create_spreadsheet',
+            kind: 'spreadsheet',
+            format: 'xlsx',
+            sheets: 1,
+            rows: 1,
+          },
+          limits,
+          storageMaxBytes: 8,
+        },
+        deps,
+      ),
+    ).resolves.toMatchObject({ bytes: 5 });
+    expect(deps.saveBuffer).toHaveBeenCalledTimes(1);
   });
 });

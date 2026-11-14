@@ -14,6 +14,9 @@ export type TSuperAdminRange = (typeof SUPER_ADMIN_RANGES)[number];
 export const SUPER_ADMIN_DEFAULT_RANGE: TSuperAdminRange = '30d';
 export const SUPER_ADMIN_DEFAULT_PAGE_SIZE = 25;
 export const SUPER_ADMIN_MAX_PAGE_SIZE = 100;
+/** Deep `skip` values are a cheap way to make the database work hard; the
+ *  portal never needs to page further than this. */
+export const SUPER_ADMIN_MAX_PAGE = 1000;
 export const SUPER_ADMIN_SEARCH_MAX_LENGTH = 120;
 /** The viewer is a read-only inspector, not an export tool: cap one message. */
 export const SUPER_ADMIN_MESSAGE_MAX_CHARS = 20000;
@@ -22,7 +25,7 @@ export const superAdminRangeSchema = z.enum(SUPER_ADMIN_RANGES).default(SUPER_AD
 
 export const superAdminQuerySchema = z.object({
   range: superAdminRangeSchema,
-  page: z.coerce.number().int().min(1).optional(),
+  page: z.coerce.number().int().min(1).max(SUPER_ADMIN_MAX_PAGE).optional(),
   pageSize: z.coerce.number().int().min(1).max(SUPER_ADMIN_MAX_PAGE_SIZE).optional(),
   search: z.string().trim().max(SUPER_ADMIN_SEARCH_MAX_LENGTH).optional(),
   sort: z.enum(['createdAt', 'name']).optional(),
@@ -156,6 +159,74 @@ export const superAdminMessagesResponseSchema = z.object({
 
 export type TSuperAdminMessagesResponse = z.infer<typeof superAdminMessagesResponseSchema>;
 
+export const superAdminDocumentSchema = z.object({
+  userId: z.string(),
+  userName: z.string(),
+  userEmail: z.string(),
+  conversationId: z.string(),
+  artifactId: z.string(),
+  title: z.string(),
+  versionCount: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type TSuperAdminDocument = z.infer<typeof superAdminDocumentSchema>;
+
+export const superAdminDocumentsResponseSchema = z.object({
+  documents: z.array(superAdminDocumentSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+  pages: z.number(),
+});
+
+export type TSuperAdminDocumentsResponse = z.infer<typeof superAdminDocumentsResponseSchema>;
+
+export const superAdminDocumentDetailSchema = superAdminDocumentSchema.extend({
+  content: z.string(),
+  versions: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      createdAt: z.number(),
+      source: z.string(),
+    }),
+  ),
+});
+
+export type TSuperAdminDocumentDetail = z.infer<typeof superAdminDocumentDetailSchema>;
+
+export const superAdminAuditEntrySchema = z.object({
+  id: z.string(),
+  category: z.string(),
+  action: z.string(),
+  outcome: z.string(),
+  severity: z.string(),
+  actor: z.object({
+    type: z.string(),
+    id: z.string().optional(),
+    name: z.string(),
+  }),
+  target: z.object({
+    type: z.string(),
+    id: z.string().optional(),
+    name: z.string().optional(),
+  }),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  timestamp: z.string(),
+});
+
+export type TSuperAdminAuditEntry = z.infer<typeof superAdminAuditEntrySchema>;
+
+export const superAdminAuditResponseSchema = z.object({
+  entries: z.array(superAdminAuditEntrySchema),
+  total: z.number(),
+  nextCursor: z.number().nullable(),
+});
+
+export type TSuperAdminAuditResponse = z.infer<typeof superAdminAuditResponseSchema>;
+
 export type TSuperAdminOverviewParams = {
   range?: TSuperAdminRange;
 };
@@ -178,6 +249,19 @@ export type TSuperAdminMessagesParams = {
   pageSize?: number;
   /** The conversation owner; the server verifies the pairing. */
   userId?: string;
+};
+
+export type TSuperAdminDocumentsParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  userId?: string;
+};
+
+export type TSuperAdminAuditParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
 };
 
 /* ---------------------------------------------------------------- service */
@@ -225,5 +309,32 @@ export function getSuperAdminMessages(
   const owner = userId ? `${suffix ? '&' : '?'}userId=${encodeURIComponent(userId)}` : '';
   return request.get(
     `${endpoints.superAdminConversationMessages(conversationId)}${suffix}${owner}`,
+  );
+}
+
+export function getSuperAdminDocuments(
+  params: TSuperAdminDocumentsParams = {},
+): Promise<TSuperAdminDocumentsResponse> {
+  return request.get(`${endpoints.superAdminDocuments()}${querySuffix(params)}`);
+}
+
+export function getSuperAdminDocument(
+  userId: string,
+  conversationId: string,
+  artifactId: string,
+): Promise<TSuperAdminDocumentDetail> {
+  return request.get(endpoints.superAdminDocument(userId, conversationId, artifactId));
+}
+
+export function getSuperAdminAudit(
+  params: TSuperAdminAuditParams = {},
+): Promise<TSuperAdminAuditResponse> {
+  const { page = 1, pageSize = 25, ...rest } = params;
+  return request.get(
+    `${endpoints.superAdminAudit()}${querySuffix({
+      ...rest,
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
+    })}`,
   );
 }

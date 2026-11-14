@@ -132,6 +132,57 @@ jest.mock('~/data-provider', () => ({
     isFetching: false,
     isError: false,
   }),
+  useSuperAdminDocumentsQuery: () => ({
+    data: {
+      documents: [
+        {
+          userId: 'user-a',
+          userName: 'Alice',
+          userEmail: 'alice@example.com',
+          conversationId: 'convo-1',
+          artifactId: 'artifact-1',
+          title: 'Project note',
+          versionCount: 3,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        },
+      ],
+      page: 1,
+      pageSize: 25,
+      total: 1,
+      pages: 1,
+    },
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
+  useSuperAdminDocumentQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
+  useSuperAdminAuditQuery: () => ({
+    data: {
+      entries: [
+        {
+          id: 'audit-1',
+          category: 'auth',
+          action: 'auth.login',
+          outcome: 'success',
+          severity: 'info',
+          actor: { type: 'user', id: 'user-a', name: 'Alice' },
+          target: { type: 'session', name: 'Web session' },
+          timestamp: '2026-01-02T00:00:00.000Z',
+        },
+      ],
+      total: 1,
+      nextCursor: null,
+    },
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+  }),
 }));
 
 jest.mock('~/hooks', () => ({
@@ -173,17 +224,32 @@ describe('SuperAdminView', () => {
     expect(screen.getByText('com_superadmin_forbidden')).toBeInTheDocument();
   });
 
-  it('renders usage totals and the user table', () => {
+  it('renders usage totals and the user table', async () => {
+    const user = userEvent.setup();
     renderView();
     expect(screen.getByText('com_superadmin_title')).toBeInTheDocument();
-    expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('com_superadmin_usage_by_model')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'com_superadmin_tab_users' }));
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+  });
+
+  it('renders documents and the audit log tabs', async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByRole('tab', { name: 'com_superadmin_tab_documents' }));
+    expect(screen.getByText('Project note')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'com_superadmin_tab_audit' }));
+    expect(screen.getByText('auth.login')).toBeInTheDocument();
   });
 
   it('opens a user conversation and reads its transcript', async () => {
     const user = userEvent.setup();
     renderView();
 
+    await user.click(screen.getByRole('tab', { name: 'com_superadmin_tab_users' }));
     await user.click(screen.getByText('com_superadmin_view_chats'));
     expect(await screen.findByText('Project draft')).toBeInTheDocument();
 

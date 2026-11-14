@@ -1,6 +1,8 @@
 import type {
   TSuperAdminConversation,
   TSuperAdminDailyPoint,
+  TSuperAdminDocument,
+  TSuperAdminDocumentDetail,
   TSuperAdminMessage,
   TSuperAdminModelUsage,
   TSuperAdminOverview,
@@ -56,6 +58,28 @@ export type SuperAdminMessagesResult = {
   messages: TSuperAdminMessage[];
   total: number;
 } | null;
+
+export type SuperAdminDocumentsParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  userId?: string;
+  tenantId?: string;
+};
+
+export type SuperAdminDocumentsResult = {
+  documents: TSuperAdminDocument[];
+  total: number;
+};
+
+export type SuperAdminDocumentParams = {
+  userId: string;
+  conversationId: string;
+  artifactId: string;
+  tenantId?: string;
+};
+
+export type SuperAdminDocumentResult = TSuperAdminDocumentDetail | null;
 
 export type SuperAdminDailyRow = TSuperAdminDailyPoint;
 export type SuperAdminModelRow = TSuperAdminModelUsage;

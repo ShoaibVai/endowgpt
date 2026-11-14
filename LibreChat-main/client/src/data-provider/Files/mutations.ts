@@ -214,6 +214,7 @@ export const useDeleteFilesMutation = (
         );
       });
       invalidateRecentFiles(queryClient);
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.documentStorage] });
 
       /** A storage failure still answers 200, so reporting success off the status alone would
        * tell the user a file is gone while it is sitting on disk and back in their list. */

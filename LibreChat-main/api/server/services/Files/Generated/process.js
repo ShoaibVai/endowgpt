@@ -17,6 +17,7 @@ const db = require('~/models');
  */
 function createGeneratedFilePersister({ req, limits, fileStrategy: configuredStrategy }) {
   const fileStrategy = configuredStrategy ?? req.config?.fileStrategy ?? FileSources.local;
+  const storageMaxBytes = req.config?.documents?.storageMaxBytes;
   const { saveBuffer, deleteFile } = getStrategyFunctions(fileStrategy);
   if (typeof saveBuffer !== 'function') {
     throw new Error(`File storage strategy "${fileStrategy}" cannot store generated files`);
@@ -35,12 +36,14 @@ function createGeneratedFilePersister({ req, limits, fileStrategy: configuredStr
         conversationId: file.conversationId,
         messageId: file.messageId,
         limits,
+        storageMaxBytes,
       },
       {
         fileStrategy,
         saveBuffer,
         getStorageMetadata,
         createFile: db.createFile,
+        getUserStorageUsage: db.getUserStorageUsage,
         expiredAt: retention.expiredAt ?? null,
         logger,
         deleteStored: async (stored) => {

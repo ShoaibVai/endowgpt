@@ -65,4 +65,11 @@ const transactionSchema: Schema<ITransaction> = new Schema(
   },
 );
 
+/** The superadmin overview aggregates token usage over a date range per tenant.
+ *  Without this compound index Mongo scans every transaction on every dashboard
+ *  load. */
+transactionSchema.index({ tenantId: 1, tokenType: 1, createdAt: 1 });
+/** The portal's users page applies the same range filter per owner. */
+transactionSchema.index({ user: 1, tokenType: 1, createdAt: 1 });
+
 export default transactionSchema;

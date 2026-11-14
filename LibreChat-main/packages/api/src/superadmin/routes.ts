@@ -1,9 +1,11 @@
-import { Router as ExpressRouter } from 'express';
 import { logger } from '@librechat/data-schemas';
+import { Router as ExpressRouter } from 'express';
 import { SUPER_ADMIN_DEFAULT_PAGE_SIZE, superAdminQuerySchema } from 'librechat-data-provider';
 import type {
   TSuperAdminAccess,
   TSuperAdminConversationsResponse,
+  TSuperAdminDocumentDetail,
+  TSuperAdminDocumentsResponse,
   TSuperAdminMessagesResponse,
   TSuperAdminOverview,
   TSuperAdminRange,
@@ -32,6 +34,9 @@ const RANGE_DAYS: Record<Exclude<TSuperAdminRange, 'all'>, number> = {
 };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIN_SEARCH_LENGTH = 2;
+/** User and conversation ids are Mongo ObjectIds; a malformed one is a client
+ *  mistake, not an empty result set. */
+const OBJECT_ID = /^[a-f\d]{24}$/i;
 
 function resolveRange(range: TSuperAdminRange): { from: Date; to: Date } {
   const to = new Date();
@@ -126,7 +131,7 @@ export function createSuperAdminRouter({ methods }: SuperAdminRouterDeps): Route
       return void res.status(400).json({ error: 'invalid_query' });
     }
     const userId = req.params.userId;
-    if (typeof userId !== 'string' || userId.length === 0) {
+    if (typeof userId !== 'string' || !OBJECT_ID.test(userId)) {
       return void res.status(400).json({ error: 'invalid_user' });
     }
     const page = parsed.data.page ?? 1;
@@ -150,6 +155,68 @@ export function createSuperAdminRouter({ methods }: SuperAdminRouterDeps): Route
     }
   });
 
+  router.get('/documents', async (req: SuperAdminRequest, res: Response) => {
+    const parsed = queryOf(req);
+    if (!parsed.success) {
+      return void res.status(400).json({ error: 'invalid_query' });
+    }
+    const page = parsed.data.page ?? 1;
+    const pageSize = parsed.data.pageSize ?? SUPER_ADMIN_DEFAULT_PAGE_SIZE;
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+    if (userId != null && !OBJECT_ID.test(userId)) {
+      return void res.status(400).json({ error: 'invalid_user' });
+    }
+    try {
+      const result = await methods.getSuperAdminDocuments({
+        tenantId: tenantOf(req),
+        page,
+        pageSize,
+        search: normalizeSearch(parsed.data.search),
+        userId,
+      });
+      const response: TSuperAdminDocumentsResponse = {
+        documents: result.documents,
+        ...pagination(page, pageSize, result.total),
+      };
+      return void res.status(200).json(response);
+    } catch (error) {
+      logger.error('[superadmin] documents failed:', getSafeErrorMetadata(error));
+      return void res.status(500).json({ error: 'superadmin_documents_failed' });
+    }
+  });
+
+  router.get(
+    '/documents/:userId/:conversationId/:artifactId',
+    async (req: SuperAdminRequest, res: Response) => {
+      const { userId, conversationId, artifactId } = req.params;
+      if (
+        typeof userId !== 'string' ||
+        typeof conversationId !== 'string' ||
+        typeof artifactId !== 'string' ||
+        userId.length === 0 ||
+        conversationId.length === 0 ||
+        artifactId.length === 0
+      ) {
+        return void res.status(400).json({ error: 'invalid_document' });
+      }
+      try {
+        const document: TSuperAdminDocumentDetail | null = await methods.getSuperAdminDocument({
+          userId,
+          conversationId,
+          artifactId,
+          tenantId: tenantOf(req),
+        });
+        if (document == null) {
+          return void res.status(404).json({ error: 'document_not_found' });
+        }
+        return void res.status(200).json(document);
+      } catch (error) {
+        logger.error('[superadmin] document failed:', getSafeErrorMetadata(error));
+        return void res.status(500).json({ error: 'superadmin_document_failed' });
+      }
+    },
+  );
+
   router.get(
     '/conversations/:conversationId/messages',
     async (req: SuperAdminRequest, res: Response) => {
@@ -162,7 +229,7 @@ export function createSuperAdminRouter({ methods }: SuperAdminRouterDeps): Route
       if (
         typeof conversationId !== 'string' ||
         conversationId.length === 0 ||
-        userId.length === 0
+        !OBJECT_ID.test(userId)
       ) {
         return void res.status(400).json({ error: 'invalid_conversation' });
       }

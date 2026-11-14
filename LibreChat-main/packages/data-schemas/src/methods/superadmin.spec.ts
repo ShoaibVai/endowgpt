@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { createConversationModel } from '../models/convo';
-import { createMessageModel } from '../models/message';
+import { createDocumentVersionModel } from '../models/documentVersion';
 import { createTransactionModel } from '../models/transaction';
-import { createUserModel } from '../models/user';
+import { createConversationModel } from '../models/convo';
+import { createDocumentModel } from '../models/document';
+import { createMessageModel } from '../models/message';
 import { createSuperAdminMethods } from './superadmin';
+import { createUserModel } from '../models/user';
 
 let mongoServer: MongoMemoryServer;
 const methods = createSuperAdminMethods(mongoose);
@@ -17,6 +19,8 @@ beforeAll(async () => {
   await mongoose.connect(mongoServer.getUri());
   const models = [
     createConversationModel(mongoose),
+    createDocumentModel(mongoose),
+    createDocumentVersionModel(mongoose),
     createMessageModel(mongoose),
     createTransactionModel(mongoose),
     createUserModel(mongoose),
@@ -32,6 +36,8 @@ afterAll(async () => {
 beforeEach(async () => {
   await Promise.all([
     mongoose.models.Conversation.deleteMany({}),
+    mongoose.models.Document.deleteMany({}),
+    mongoose.models.DocumentVersion.deleteMany({}),
     mongoose.models.Message.deleteMany({}),
     mongoose.models.Transaction.deleteMany({}),
     mongoose.models.User.deleteMany({}),
@@ -61,6 +67,7 @@ async function insertConversation({
   isTemporary = false,
   subagentThread,
   isArchived = false,
+  createdAt = NOW,
 }: {
   conversationId: string;
   userId: string;
@@ -69,6 +76,7 @@ async function insertConversation({
   isTemporary?: boolean;
   subagentThread?: Record<string, unknown>;
   isArchived?: boolean;
+  createdAt?: Date;
 }) {
   await mongoose.models.Conversation.collection.insertOne({
     conversationId,
@@ -78,7 +86,7 @@ async function insertConversation({
     isTemporary,
     isArchived,
     ...(subagentThread != null ? { subagentThread } : {}),
-    createdAt: NOW,
+    createdAt,
     updatedAt: NOW,
   });
 }
@@ -92,6 +100,7 @@ async function insertMessage({
   content,
   tokenCount,
   model = 'deepseek-v4.1-flash',
+  createdAt = NOW,
 }: {
   conversationId: string;
   userId: string;
@@ -101,6 +110,7 @@ async function insertMessage({
   content?: Array<Record<string, unknown>>;
   tokenCount: number;
   model?: string;
+  createdAt?: Date;
 }) {
   await mongoose.models.Message.collection.insertOne({
     conversationId,
@@ -112,7 +122,43 @@ async function insertMessage({
     text,
     ...(content != null ? { content } : {}),
     tokenCount,
+    createdAt,
+  });
+}
+
+async function insertDocument({
+  userId,
+  conversationId,
+  artifactId,
+  title,
+  content,
+  versions = [],
+  tenantId,
+}: {
+  userId: mongoose.Types.ObjectId;
+  conversationId: string;
+  artifactId: string;
+  title: string;
+  content: string;
+  versions?: Array<{
+    id: string;
+    title: string;
+    content: string;
+    createdAt: number;
+    source: string;
+  }>;
+  tenantId?: string;
+}) {
+  await mongoose.models.Document.collection.insertOne({
+    user: userId,
+    conversationId,
+    artifactId,
+    title,
+    content,
+    versions,
+    ...(tenantId != null ? { tenantId } : {}),
     createdAt: NOW,
+    updatedAt: NOW,
   });
 }
 
@@ -356,6 +402,197 @@ describe('Superadmin methods', () => {
       completionTokens: 60,
       totalTokens: 100,
     });
+  });
+
+  it('narrows per-user totals to the selected range', async () => {
+    const alice = objectId();
+    await insertUser(alice, 'Alice', 'alice@example.com');
+    await insertConversation({ conversationId: 'c-now', userId: alice.toString(), title: 'Now' });
+    await insertConversation({
+      conversationId: 'c-old',
+      userId: alice.toString(),
+      title: 'Old',
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    });
+    await insertMessage({
+      conversationId: 'c-now',
+      userId: alice.toString(),
+      messageId: 'm-now',
+      isCreatedByUser: true,
+      tokenCount: 4,
+    });
+    await insertMessage({
+      conversationId: 'c-old',
+      userId: alice.toString(),
+      messageId: 'm-old',
+      isCreatedByUser: true,
+      tokenCount: 9,
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    });
+
+    const result = await methods.getSuperAdminUsers({
+      from: FROM,
+      to: NOW,
+      page: 1,
+      pageSize: 10,
+    });
+
+    expect(result.users[0]).toMatchObject({ conversations: 1, messages: 1 });
+  });
+
+  it('lists deployment documents with owners and returns full document content', async () => {
+    const alice = objectId();
+    const bob = objectId();
+    await insertUser(alice, 'Alice', 'alice@example.com');
+    await insertUser(bob, 'Bob', 'bob@example.com');
+    await insertDocument({
+      userId: alice,
+      conversationId: 'c-alice',
+      artifactId: 'artifact-1',
+      title: 'Alice handbook',
+      content: '# Handbook\n\nHello',
+      versions: [
+        { id: 'v1', title: 'Alice handbook', content: '# Handbook', createdAt: 1, source: 'user' },
+      ],
+    });
+    await insertDocument({
+      userId: bob,
+      conversationId: 'c-bob',
+      artifactId: 'artifact-2',
+      title: 'Bob notes',
+      content: 'Bob content',
+    });
+
+    const list = await methods.getSuperAdminDocuments({ page: 1, pageSize: 10 });
+    expect(list.total).toBe(2);
+    expect(list.documents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          userId: alice.toString(),
+          userName: 'Alice',
+          title: 'Alice handbook',
+          versionCount: 1,
+        }),
+        expect.objectContaining({ userId: bob.toString(), userName: 'Bob', title: 'Bob notes' }),
+      ]),
+    );
+
+    const searched = await methods.getSuperAdminDocuments({
+      page: 1,
+      pageSize: 10,
+      search: 'handbook',
+    });
+    expect(searched.total).toBe(1);
+    expect(searched.documents[0]?.title).toBe('Alice handbook');
+
+    const detail = await methods.getSuperAdminDocument({
+      userId: alice.toString(),
+      conversationId: 'c-alice',
+      artifactId: 'artifact-1',
+    });
+    expect(detail).toMatchObject({
+      title: 'Alice handbook',
+      content: '# Handbook\n\nHello',
+      versionCount: 1,
+      userName: 'Alice',
+    });
+
+    const wrongOwner = await methods.getSuperAdminDocument({
+      userId: bob.toString(),
+      conversationId: 'c-alice',
+      artifactId: 'artifact-1',
+    });
+    expect(wrongOwner).toBeNull();
+  });
+
+  it('scopes document reads to the tenant when the admin has one', async () => {
+    const alice = objectId();
+    const bob = objectId();
+    await insertUser(alice, 'Alice', 'alice@example.com');
+    await insertUser(bob, 'Bob', 'bob@example.com');
+    await insertDocument({
+      userId: alice,
+      conversationId: 'c-alice',
+      artifactId: 'artifact-a',
+      title: 'Tenant A note',
+      content: 'A',
+      tenantId: 'tenant-a',
+    });
+    await insertDocument({
+      userId: bob,
+      conversationId: 'c-bob',
+      artifactId: 'artifact-b',
+      title: 'Tenant B note',
+      content: 'B',
+      tenantId: 'tenant-b',
+    });
+
+    const list = await methods.getSuperAdminDocuments({
+      page: 1,
+      pageSize: 10,
+      tenantId: 'tenant-a',
+    });
+    expect(list.total).toBe(1);
+    expect(list.documents[0]).toMatchObject({ artifactId: 'artifact-a', title: 'Tenant A note' });
+
+    const crossTenant = await methods.getSuperAdminDocument({
+      userId: bob.toString(),
+      conversationId: 'c-bob',
+      artifactId: 'artifact-b',
+      tenantId: 'tenant-a',
+    });
+    expect(crossTenant).toBeNull();
+  });
+
+  it('reports snapshot metadata from the versions collection', async () => {
+    const alice = objectId();
+    await insertUser(alice, 'Alice', 'alice@example.com');
+    await mongoose.models.Document.collection.insertOne({
+      user: alice,
+      conversationId: 'c-split',
+      artifactId: 'artifact-split',
+      title: 'Split document',
+      content: 'current',
+      versionCount: 2,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await mongoose.models.DocumentVersion.collection.insertMany([
+      {
+        user: alice,
+        conversationId: 'c-split',
+        artifactId: 'artifact-split',
+        id: 'v1',
+        title: 'Split document',
+        content: 'first',
+        createdAt: 1,
+        source: 'user',
+      },
+      {
+        user: alice,
+        conversationId: 'c-split',
+        artifactId: 'artifact-split',
+        id: 'v2',
+        title: 'Split document',
+        content: 'second',
+        createdAt: 2,
+        source: 'user',
+      },
+    ]);
+
+    const list = await methods.getSuperAdminDocuments({ page: 1, pageSize: 10 });
+    expect(list.documents[0]).toMatchObject({
+      artifactId: 'artifact-split',
+      versionCount: 2,
+    });
+
+    const detail = await methods.getSuperAdminDocument({
+      userId: alice.toString(),
+      conversationId: 'c-split',
+      artifactId: 'artifact-split',
+    });
+    expect(detail?.versionCount).toBe(2);
+    expect(detail?.versions.map((version) => version.id)).toEqual(['v1', 'v2']);
   });
 
   it('lists a user conversation and returns its transcript, excluding temporary chats', async () => {

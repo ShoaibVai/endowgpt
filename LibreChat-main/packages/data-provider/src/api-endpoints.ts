@@ -84,6 +84,7 @@ export const messagesArtifacts = (messageId: string) => `${messagesRoot}/artifac
 /** endowGPT document artifacts (Mongo-backed, TipTap editor). */
 const documentsRoot = `${BASE_URL}/api/documents`;
 export const documents = () => documentsRoot;
+export const documentStorage = () => `${documentsRoot}/storage`;
 export const documentPath = (conversationId: string, artifactId: string) =>
   `${documentsRoot}/${encodeURIComponent(conversationId)}/${encodeURIComponent(artifactId)}`;
 export const documentVersionPath = (
@@ -595,6 +596,12 @@ export const superAdminUserConversations = (userId: string) =>
   `${superAdminUsers()}/${encodeURIComponent(userId)}/conversations`;
 export const superAdminConversationMessages = (conversationId: string) =>
   `${superAdmin()}/conversations/${encodeURIComponent(conversationId)}/messages`;
+export const superAdminDocuments = () => `${superAdmin()}/documents`;
+export const superAdminDocument = (userId: string, conversationId: string, artifactId: string) =>
+  `${superAdminDocuments()}/${encodeURIComponent(userId)}/${encodeURIComponent(
+    conversationId,
+  )}/${encodeURIComponent(artifactId)}`;
+export const superAdminAudit = () => `${superAdmin()}/audit`;
 
 /* Conversation traces */
 export const conversationTrace = (conversationId: string) =>

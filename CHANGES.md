@@ -104,7 +104,7 @@ sandbox.
 | `packages/data-schemas/src/methods/document.ts`                      | M4        | upsert/list/get/version/restore/delete methods                                                                                |
 | `packages/data-provider/src/documents.ts`                            | M4        | shared request/response schemas + REST service                                                                                |
 | `client/src/components/Artifacts/Document/index.tsx`                 | M4        | TipTap editor surface exposed through the artifact panel                                                                      |
-| `client/src/components/Artifacts/Document/markdown.ts`               | M4        | marked ↔ turndown Markdown bridge                                                                                            |
+| `client/src/components/Artifacts/Document/markdown.ts`               | M4        | marked ↔ turndown Markdown bridge                                                                                             |
 | `client/src/components/Artifacts/Document/exporters.ts`              | M4        | DOCX/PDF/rich-copy exports (client-side)                                                                                      |
 | `client/src/components/Artifacts/Document/tiptapMarks.ts`            | M5        | `endowInsert`/`endowDelete` TipTap marks for inline diffs                                                                     |
 | `client/src/components/Artifacts/Document/aiSelection.tsx`           | M5        | floating selection toolbar: rewrite/expand/shorten/grammar/translate, tone submenu, inline Ask AI instruction                 |
@@ -120,22 +120,24 @@ sandbox.
 | `client/src/components/Brand/LogoSplash.tsx`                         | M2        | once-per-session reveal video with static fallback; skip + reduced-motion                                                     |
 | `client/src/components/Brand/Credits.tsx`                            | M2        | `/credits` attribution page                                                                                                   |
 | `client/src/components/Brand/endow.css`                              | M2        | splash keyframes only (no brand colors)                                                                                       |
-| `api/server/routes/superadmin.js`                                    | M8        | thin CJS mount: JWT + `access:admin`, then the TS router                                                                      |
-| `packages/data-provider/src/superadmin.ts`                           | M8        | shared superadmin wire types, query schemas, and read service                                                                 |
+| `api/server/routes/superadmin.js`                                    | M8        | thin CJS mount: JWT + `access:admin`, the TS router, and the reused audit router                                              |
+| `packages/data-provider/src/superadmin.ts`                           | M8        | shared superadmin wire types, query schemas, and read service (usage, chats, documents, audit)                                |
 | `packages/data-schemas/src/types/superadmin.ts`                      | M8        | superadmin method input/result types                                                                                          |
-| `packages/data-schemas/src/methods/superadmin.ts`                    | M8        | overview, per-user usage, conversation list, and transcript aggregations                                                      |
+| `packages/data-schemas/src/methods/superadmin.ts`                    | M8        | overview, per-user usage, conversation/transcript, and document aggregations                                                  |
 | `packages/data-schemas/src/methods/superadmin.spec.ts`               | M8        | aggregation tests (transactions, message fallback, search, ownership)                                                         |
-| `packages/api/src/superadmin/routes.ts`                              | M8        | validated read-only router + stable error codes                                                                               |
+| `packages/api/src/superadmin/routes.ts`                              | M8        | validated read-only router (usage, chats, documents) + stable error codes                                                     |
 | `packages/api/src/superadmin/routes.spec.ts`                         | M8        | HTTP contract tests for the portal                                                                                            |
 | `packages/api/src/superadmin/index.ts`                               | M8        | module export                                                                                                                 |
-| `client/src/data-provider/SuperAdmin/queries.ts`                     | M8        | React Query hooks for access, overview, users, chats, messages                                                                |
+| `client/src/data-provider/SuperAdmin/queries.ts`                     | M8        | React Query hooks for access, overview, users, chats, messages, documents, and audit                                          |
 | `client/src/data-provider/SuperAdmin/index.ts`                       | M8        | data-provider barrel                                                                                                          |
-| `client/src/components/SuperAdmin/SuperAdminView.tsx`                | M8        | `/superadmin` page: range KPIs, daily/model usage, user table                                                                 |
+| `client/src/components/SuperAdmin/SuperAdminView.tsx`                | M8        | `/superadmin` page: tabbed overview, users, documents, and audit                                                              |
 | `client/src/components/SuperAdmin/panels.tsx`                        | M8        | panels, KPI cards, usage tables, user table, pagination                                                                       |
 | `client/src/components/SuperAdmin/ChatHistory.tsx`                   | M8        | read-only conversation picker and message transcript dialog                                                                   |
+| `client/src/components/SuperAdmin/Documents.tsx`                     | M8        | deployment-wide document table and read-only content viewer                                                                   |
+| `client/src/components/SuperAdmin/Audit.tsx`                         | M8        | audit-log search and paginated read-only table                                                                                |
 | `client/src/components/SuperAdmin/format.ts`                         | M8        | locale-aware number/date formatting                                                                                           |
 | `client/src/components/SuperAdmin/index.ts`                          | M8        | lazy route entry                                                                                                              |
-| `client/src/components/SuperAdmin/__tests__/SuperAdminView.spec.tsx` | M8        | access, totals, and transcript component tests                                                                                |
+| `client/src/components/SuperAdmin/__tests__/SuperAdminView.spec.tsx` | M8        | access, totals, documents, audit, and transcript component tests                                                              |
 | `client/src/routes/index.tsx`                                        | M8        | `/superadmin` route                                                                                                           |
 | `client/src/hooks/Nav/useUnifiedSidebarLinks.ts`                     | M8        | sidebar entry gated by `access:admin`                                                                                         |
 | `client/src/locales/en/translation.json`                             | M8        | superadmin copy keys                                                                                                          |
@@ -146,6 +148,45 @@ sandbox.
 | `client/src/components/Messages/Content/CodeBar.tsx`                 | M9.3      | uses the labeled preview toggle instead of an icon-only control                                                              |
 | `client/src/components/Messages/Content/FloatingCodeBar.tsx`         | M9.3      | exposes the preview toggle while scrolled inside a long code block                                                           |
 | `client/src/components/Messages/Content/__tests__/CodeBlock.preview.test.tsx` | M9.3 | auto-open, shim ordering, snapshot refresh, and language-alias coverage (new file)                                    |
+
+## Per-user document storage cap (M10, intentional divergence)
+
+The cap covers saved editor documents plus generated files. Each document's
+current Markdown is counted once (version snapshots are backups the user cannot
+delete individually); temporary chat uploads keep their own TTL and are
+excluded. The default is 100 MB and is configurable through
+`documents.storageMaxBytes`.
+
+| Path                                                                 | Change                                                                                                  |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `packages/data-provider/src/config.ts`                               | `documents.storageMaxBytes` lever with a 100 MB default                                                 |
+| `librechat.yaml`                                                     | sets `documents.storageMaxBytes: 104857600`                                                             |
+| `packages/data-provider/src/documents.ts`                            | `TDocumentStorageUsage` wire type and `getDocumentStorage()` service                                    |
+| `packages/data-provider/src/api-endpoints.ts`                        | `GET /api/documents/storage` endpoint builder                                                           |
+| `packages/data-provider/src/keys.ts`                                 | `QueryKeys.documentStorage`                                                                             |
+| `packages/data-provider/src/data-service.ts`                         | re-exports the storage read                                                                            |
+| `packages/data-schemas/src/methods/storage.ts`                       | new aggregation: document `content` UTF-8 bytes + generated file `bytes`                                |
+| `packages/data-schemas/src/methods/index.ts`                         | registers `getUserStorageUsage` in `createMethods`                                                      |
+| `packages/data-schemas/src/index.ts`                                 | exports the storage types                                                                               |
+| `packages/api/src/documents/routes.ts`                               | `GET /storage`, quota-aware `PUT`/restore, stable `storage_quota_exceeded` 413                          |
+| `api/server/routes/documents.js`                                     | passes `getUserStorageUsage` into the TS router                                                         |
+| `packages/api/src/files/generated/persist.ts`                        | rejects generated files that would exceed the user cap, before writing bytes                            |
+| `api/server/services/Files/Generated/process.js`                     | wires the storage limit and usage read into generated-file persistence                                  |
+| `client/src/data-provider/Documents/queries.ts`                      | `useGetDocumentStorageQuery` (60 s refresh + focus refresh)                                             |
+| `client/src/data-provider/Documents/mutations.ts`                    | invalidates storage after restore/delete                                                                |
+| `client/src/data-provider/Files/mutations.ts`                        | invalidates storage after file deletion                                                                 |
+| `client/src/components/Storage/StorageUsage.tsx`                     | Profile section usage row with progress, breakdown, and manage actions                                  |
+| `client/src/components/Storage/StorageIndicator.tsx`                 | bottom-left rail meter that opens My Files                                                              |
+| `client/src/components/Nav/Settings/registry.tsx`                    | adds the storage row to Account · Profile                                                               |
+| `client/src/components/UnifiedSidebar/ExpandedPanel.tsx`             | renders the meter above the account control                                                             |
+| `client/src/components/Chat/Input/Files/MyFilesModal.tsx`            | usage summary and “Manage documents” link                                                               |
+| `client/src/components/Artifacts/Document/index.tsx`                 | maps quota failures to localized editor copy                                                            |
+| `client/src/components/Chat/Messages/Content/FilePreviewDialog.tsx`  | surfaces quota failures when importing a file into the editor                                           |
+| `client/src/locales/en/translation.json`                             | storage and quota copy                                                                                  |
+| `packages/data-schemas/src/methods/storage.spec.ts`                  | aggregation contract tests                                                                              |
+| `packages/api/src/documents/routes.spec.ts`                          | storage endpoint and quota HTTP contract tests                                                          |
+| `packages/api/src/files/generated/persist.spec.ts`                   | generated-file quota tests                                                                              |
+| `client/src/components/Storage/__tests__/StorageUsage.spec.tsx`      | meter, actions, full, unavailable, and loading states                                                   |
 
 ## Brand-asset findings (recorded for future maintainers)
 
@@ -240,13 +281,24 @@ LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
   never an HTML artifact. This is an intentional divergence from upstream.
 - **M8** - superadmin portal: a read-only `/superadmin` surface for users with
   the `access:admin` capability. Adds `/api/superadmin` (overview, users,
-  conversations, transcript, access) with shared wire types in
-  `packages/data-provider`, aggregation methods in `packages/data-schemas`, and
-  a validation-only router in `packages/api`. Token totals come from the
-  per-request `transactions` records and fall back to saved message
-  `tokenCount` when a range has no request-level usage. Chat history excludes
-  temporary chats and subagent threads and never reads `privateText`. The
-  client page reuses semantic theme roles and `@librechat/client` primitives,
-  with a sidebar entry shown only after the access probe succeeds. Tests cover
-  transaction vs. fallback aggregation, search, pagination, ownership checks,
-  the HTTP contract, and the page's access/totals/transcript states.
+  conversations, transcript, documents, document content, access) with shared
+  wire types in `packages/data-provider`, aggregation methods in
+  `packages/data-schemas`, and a validation-only router in `packages/api`.
+  Audit-log reads reuse the existing admin audit router, mounted at
+  `/api/superadmin/audit`, so the portal does not duplicate filter, cursor, or
+  chain logic. Token totals come from the per-request `transactions` records and
+  fall back to saved message `tokenCount` when a range has no request-level
+  usage. Chat history excludes temporary chats and subagent threads and never
+  reads `privateText`. The client page uses tabbed Overview / Users / Documents
+  / Audit surfaces, reuses semantic theme roles and `@librechat/client`
+  primitives, and shows the sidebar entry only after the access probe succeeds.
+  Tests cover transaction vs. fallback aggregation, structured cache tokens,
+  search, pagination, ownership checks, document content, the HTTP contract,
+  and the page's access, totals, documents, audit, and transcript states.
+- **M10** — per-user document storage cap: `documents.storageMaxBytes`
+  defaults to 100 MB and covers current editor-document content plus generated
+  files, not version snapshots or temporary uploads. `GET /api/documents/storage`
+  reports usage; document saves/restores and generated-file creation reject
+  writes that would cross the cap. The Profile section and the bottom-left rail
+  show a shared meter, with My Files and `/documents` as the deletion paths.
+  Quota failures use a stable `storage_quota_exceeded` code and localized copy.

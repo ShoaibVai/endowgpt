@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import copy from 'copy-to-clipboard';
+import { useNavigate } from 'react-router-dom';
 import { Download, PencilLine } from 'lucide-react';
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   OGDialogContent,
   OGDialogTitle,
   OGDialogDescription,
+  useToastContext,
 } from '@librechat/client';
 import {
   getFileExtension,
@@ -26,9 +27,14 @@ import {
 } from '~/data-provider';
 import { getDownloadFilename, logger, sortPagesByRelevance, triggerDownload } from '~/utils';
 import { useMessagePartsHost } from '~/Providers/MessagePartsHostContext';
-import CopyButton from '~/components/Messages/Content/CopyButton';
 import { useShareContext, useArtifactsContext } from '~/Providers';
+import CopyButton from '~/components/Messages/Content/CopyButton';
 import { useLocalize } from '~/hooks';
+
+function isStorageQuotaExceeded(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: string } } })?.response?.data;
+  return data?.error === 'storage_quota_exceeded';
+}
 
 /** endowGPT: one shared import action; the save lands in the document store
  *  keyed by the current conversation, then the route opens the full editor. */
@@ -43,6 +49,7 @@ function EditDocumentAction({
 }) {
   const localize = useLocalize();
   const navigate = useNavigate();
+  const { showToast } = useToastContext();
   const { conversationId } = useArtifactsContext();
   const [saving, setSaving] = useState(false);
   const artifactId = useMemo(
@@ -74,8 +81,14 @@ function EditDocumentAction({
             `/documents/${encodeURIComponent(conversationId)}/${encodeURIComponent(artifactId)}`,
           );
         },
-        onError: () => {
+        onError: (error) => {
           setSaving(false);
+          showToast({
+            status: 'error',
+            message: isStorageQuotaExceeded(error)
+              ? localize('com_error_document_storage_full')
+              : localize('com_error_document_save_failed'),
+          });
         },
       },
     );

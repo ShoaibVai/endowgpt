@@ -8,13 +8,29 @@ import type * as t from 'librechat-data-provider';
 export const useGetDocumentsQuery = (
   config?: UseQueryOptions<t.TDocumentSummary[]>,
 ): QueryObserverResult<t.TDocumentSummary[], unknown> => {
-  return useQuery<t.TDocumentSummary[]>(
-    [QueryKeys.documents],
-    () => dataService.getDocuments(),
+  return useQuery<t.TDocumentSummary[]>([QueryKeys.documents], () => dataService.getDocuments(), {
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    ...config,
+  });
+};
+
+/** Current usage across saved documents and generated files. Polling keeps the
+ *  profile meter and the sidebar indicator current after model-generated files,
+ *  which have no client mutation to invalidate; document and file mutations
+ *  invalidate the key directly, so the poll is only a safety net. */
+export const useGetDocumentStorageQuery = (
+  config?: UseQueryOptions<t.TDocumentStorageUsage>,
+): QueryObserverResult<t.TDocumentStorageUsage, unknown> => {
+  return useQuery<t.TDocumentStorageUsage>(
+    [QueryKeys.documentStorage],
+    () => dataService.getDocumentStorage(),
     {
       staleTime: 15_000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchInterval: 300_000,
       ...config,
     },
   );

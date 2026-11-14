@@ -1,5 +1,4 @@
 import { SUPER_ADMIN_MESSAGE_MAX_CHARS } from 'librechat-data-provider';
-import type { FilterQuery, Model } from 'mongoose';
 import type {
   TSuperAdminConversation,
   TSuperAdminDailyPoint,
@@ -7,9 +6,14 @@ import type {
   TSuperAdminModelUsage,
   TSuperAdminUser,
 } from 'librechat-data-provider';
+import type { FilterQuery, Model } from 'mongoose';
 import type {
   SuperAdminConversationsParams,
   SuperAdminConversationsResult,
+  SuperAdminDocumentParams,
+  SuperAdminDocumentResult,
+  SuperAdminDocumentsParams,
+  SuperAdminDocumentsResult,
   SuperAdminMessagesParams,
   SuperAdminMessagesResult,
   SuperAdminOverviewResult,
@@ -17,8 +21,14 @@ import type {
   SuperAdminUsersParams,
   SuperAdminUsersResult,
 } from '~/types';
-import type { ITransaction } from '~/schema/transaction';
+import type {
+  IDocument,
+  IDocumentVersion,
+  IDocumentVersionMeta,
+  IDocumentVersionRecord,
+} from '~/types/document';
 import type { IConversation, IMessage, IUser } from '~/types';
+import type { ITransaction } from '~/schema/transaction';
 
 type TokenSource = 'transactions' | 'messages';
 
@@ -54,6 +64,19 @@ type ConversationMessageRow = {
   completionTokens: number;
 };
 type ConversationTokenRow = { _id: string; promptTokens: number; completionTokens: number };
+/** One collection read answers every overview question for that collection. */
+type ConversationFacet = { count?: CountRow[]; daily?: DayCountRow[] };
+type MessageFacet = {
+  count?: CountRow[];
+  activeUsers?: CountRow[];
+  daily?: DayMessageRow[];
+  models?: ModelMessageRow[];
+};
+type TransactionFacet = {
+  count?: CountRow[];
+  daily?: DayTokenRow[];
+  models?: ModelTokenRow[];
+};
 
 const tenantMatch = (tenantId?: string) => (tenantId ? { tenantId } : {});
 
@@ -161,6 +184,8 @@ export interface SuperAdminMethods {
     params: SuperAdminConversationsParams,
   ) => Promise<SuperAdminConversationsResult>;
   getSuperAdminMessages: (params: SuperAdminMessagesParams) => Promise<SuperAdminMessagesResult>;
+  getSuperAdminDocuments: (params: SuperAdminDocumentsParams) => Promise<SuperAdminDocumentsResult>;
+  getSuperAdminDocument: (params: SuperAdminDocumentParams) => Promise<SuperAdminDocumentResult>;
 }
 
 export function createSuperAdminMethods(mongoose: typeof import('mongoose')): SuperAdminMethods {
@@ -189,73 +214,74 @@ export function createSuperAdminMethods(mongoose: typeof import('mongoose')): Su
       createdAt: { $gte: scope.from, $lte: scope.to },
     };
 
-    const [
-      userCount,
-      activeUserRows,
-      conversationCount,
-      messageCount,
-      conversationDays,
-      messageDays,
-      transactionDays,
-      transactionModels,
-      messageModels,
-      transactionCount,
-    ] = await Promise.all([
+    const [userCount, conversationFacets, messageFacets, transactionFacets] = await Promise.all([
       User.countDocuments(base),
-      Message.aggregate<CountRow>([
-        { $match: messageMatch },
-        { $group: { _id: '$user' } },
-        { $count: 'total' },
-      ]),
-      Conversation.countDocuments(convoMatch),
-      Message.countDocuments(messageMatch),
-      Conversation.aggregate<DayCountRow>([
+      Conversation.aggregate<ConversationFacet>([
         { $match: convoMatch },
-        { $group: { _id: dayBucket(), count: { $sum: 1 } } },
+        {
+          $facet: {
+            count: [{ $count: 'total' }],
+            daily: [{ $group: { _id: dayBucket(), count: { $sum: 1 } } }],
+          },
+        },
       ]),
-      Message.aggregate<DayMessageRow>([
+      Message.aggregate<MessageFacet>([
         { $match: messageMatch },
         {
-          $group: {
-            _id: dayBucket(),
-            messages: { $sum: 1 },
-            ...messageTokenSums(),
+          $facet: {
+            count: [{ $count: 'total' }],
+            activeUsers: [{ $group: { _id: '$user' } }, { $count: 'total' }],
+            daily: [{ $group: { _id: dayBucket(), messages: { $sum: 1 }, ...messageTokenSums() } }],
+            models: [
+              {
+                $group: {
+                  _id: { $ifNull: ['$model', ''] },
+                  messages: { $sum: 1 },
+                  ...messageTokenSums(),
+                },
+              },
+            ],
           },
         },
       ]),
-      Transaction.aggregate<DayTokenRow>([
+      Transaction.aggregate<TransactionFacet>([
         { $match: { ...transactionMatch, tokenType: { $in: ['prompt', 'completion'] } } },
         {
-          $group: {
-            _id: { date: dayBucket(), tokenType: '$tokenType' },
-            tokens: transactionTokenSum(),
+          $facet: {
+            count: [{ $count: 'total' }],
+            daily: [
+              {
+                $group: {
+                  _id: { date: dayBucket(), tokenType: '$tokenType' },
+                  tokens: transactionTokenSum(),
+                },
+              },
+            ],
+            models: [
+              {
+                $group: {
+                  _id: { model: { $ifNull: ['$model', ''] }, tokenType: '$tokenType' },
+                  tokens: transactionTokenSum(),
+                },
+              },
+            ],
           },
         },
       ]),
-      Transaction.aggregate<ModelTokenRow>([
-        { $match: { ...transactionMatch, tokenType: { $in: ['prompt', 'completion'] } } },
-        {
-          $group: {
-            _id: { model: { $ifNull: ['$model', ''] }, tokenType: '$tokenType' },
-            tokens: transactionTokenSum(),
-          },
-        },
-      ]),
-      Message.aggregate<ModelMessageRow>([
-        { $match: messageMatch },
-        {
-          $group: {
-            _id: { $ifNull: ['$model', ''] },
-            messages: { $sum: 1 },
-            ...messageTokenSums(),
-          },
-        },
-      ]),
-      Transaction.countDocuments({
-        ...transactionMatch,
-        tokenType: { $in: ['prompt', 'completion'] },
-      }),
     ]);
+
+    const conversationFacet = conversationFacets[0];
+    const messageFacet = messageFacets[0];
+    const transactionFacet = transactionFacets[0];
+    const conversationCount = conversationFacet?.count?.[0]?.total ?? 0;
+    const messageCount = messageFacet?.count?.[0]?.total ?? 0;
+    const transactionCount = transactionFacet?.count?.[0]?.total ?? 0;
+    const activeUserRows = messageFacet?.activeUsers ?? [];
+    const conversationDays = conversationFacet?.daily ?? [];
+    const messageDays = messageFacet?.daily ?? [];
+    const transactionDays = transactionFacet?.daily ?? [];
+    const transactionModels = transactionFacet?.models ?? [];
+    const messageModels = messageFacet?.models ?? [];
 
     const tokenSource: TokenSource = transactionCount > 0 ? 'transactions' : 'messages';
     const conversationByDay = new Map(conversationDays.map((row) => [row._id, row.count]));
@@ -382,13 +408,19 @@ export function createSuperAdminMethods(mongoose: typeof import('mongoose')): Su
       isTemporary: { $ne: true },
       subagentThread: { $exists: false },
       user: { $in: ids },
+      createdAt: { $gte: params.from, $lte: params.to },
     };
     const messageMatch = {
       ...base,
       isTemporary: { $ne: true },
       user: { $in: ids },
+      createdAt: { $gte: params.from, $lte: params.to },
     };
-    const transactionMatch = { ...base, user: { $in: objectIds } };
+    const transactionMatch = {
+      ...base,
+      user: { $in: objectIds },
+      createdAt: { $gte: params.from, $lte: params.to },
+    };
 
     const [conversationRows, messageRows, transactionRows, transactionCount] = await Promise.all([
       Conversation.aggregate<UserConversationRow>([
@@ -427,8 +459,7 @@ export function createSuperAdminMethods(mongoose: typeof import('mongoose')): Su
         },
       ]),
       Transaction.countDocuments({
-        ...base,
-        user: { $in: objectIds },
+        ...transactionMatch,
         tokenType: { $in: ['prompt', 'completion'] },
       }),
     ]);
@@ -636,11 +667,159 @@ export function createSuperAdminMethods(mongoose: typeof import('mongoose')): Su
     return { messages, total };
   }
 
+  async function getSuperAdminDocuments(
+    params: SuperAdminDocumentsParams,
+  ): Promise<SuperAdminDocumentsResult> {
+    const Document = mongoose.models.Document as Model<IDocument>;
+
+    const query: FilterQuery<IDocument> = { ...tenantMatch(params.tenantId) };
+    if (params.userId && mongoose.isObjectIdOrHexString(params.userId)) {
+      query.user = new mongoose.Types.ObjectId(params.userId);
+    }
+    if (params.search) {
+      const regex = new RegExp(escapeRegex(params.search), 'i');
+      query.$or = [{ title: regex }, { artifactId: regex }, { conversationId: regex }];
+    }
+
+    type DocumentRow = {
+      userId: string;
+      conversationId: string;
+      artifactId: string;
+      title: string;
+      versionCount: number;
+      createdAt?: Date;
+      updatedAt?: Date;
+      ownerName?: string;
+      ownerUsername?: string;
+      ownerEmail?: string;
+    };
+
+    const [total, rows] = await Promise.all([
+      Document.countDocuments(query),
+      Document.aggregate<DocumentRow>([
+        { $match: query },
+        { $sort: { updatedAt: -1 } },
+        { $skip: (params.page - 1) * params.pageSize },
+        { $limit: params.pageSize },
+        {
+          $addFields: {
+            versionCount: {
+              $ifNull: ['$versionCount', { $size: { $ifNull: ['$versions', []] } }],
+            },
+            ownerId: { $toString: '$user' },
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'owner',
+          },
+        },
+        { $unwind: { path: '$owner', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 0,
+            userId: '$ownerId',
+            conversationId: 1,
+            artifactId: 1,
+            title: 1,
+            versionCount: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            ownerName: '$owner.name',
+            ownerUsername: '$owner.username',
+            ownerEmail: '$owner.email',
+          },
+        },
+      ]),
+    ]);
+
+    const documents = rows.map((row) => ({
+      userId: row.userId,
+      userName: row.ownerName || row.ownerUsername || '',
+      userEmail: row.ownerEmail ?? '',
+      conversationId: row.conversationId,
+      artifactId: row.artifactId,
+      title: row.title,
+      versionCount: row.versionCount ?? 0,
+      createdAt: toIso(row.createdAt) ?? new Date(0).toISOString(),
+      updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
+    }));
+
+    return { documents, total };
+  }
+
+  async function getSuperAdminDocument(
+    params: SuperAdminDocumentParams,
+  ): Promise<SuperAdminDocumentResult> {
+    const Document = mongoose.models.Document as Model<IDocument>;
+    const Version = mongoose.models.DocumentVersion as Model<IDocumentVersionRecord>;
+    const User = mongoose.models.User as Model<IUser>;
+
+    if (!mongoose.isObjectIdOrHexString(params.userId)) {
+      return null;
+    }
+
+    const ownerId = new mongoose.Types.ObjectId(params.userId);
+    const key = {
+      ...tenantMatch(params.tenantId),
+      user: ownerId,
+      conversationId: params.conversationId,
+      artifactId: params.artifactId,
+    };
+
+    const [doc, storedVersions] = await Promise.all([
+      Document.findOne(key).lean<IDocument>(),
+      Version.find(key)
+        .select('id title createdAt source -_id')
+        .sort({ createdAt: 1, _id: 1 })
+        .lean<IDocumentVersionMeta[]>(),
+    ]);
+
+    if (doc == null) {
+      return null;
+    }
+
+    /** Rows written before the split still carry their history embedded. */
+    let versions = storedVersions;
+    if (versions.length === 0) {
+      const legacy = await Document.findOne(key)
+        .select('versions')
+        .lean<{ versions?: IDocumentVersion[] } | null>();
+      versions = (legacy?.versions ?? []).map(({ id, title, createdAt, source }) => ({
+        id,
+        title,
+        createdAt,
+        source,
+      }));
+    }
+
+    const owner = await User.findById(doc.user).select('_id name username email').lean<IUser>();
+
+    return {
+      userId: doc.user.toString(),
+      userName: owner?.name || owner?.username || '',
+      userEmail: owner?.email ?? '',
+      conversationId: doc.conversationId,
+      artifactId: doc.artifactId,
+      title: doc.title,
+      versionCount: doc.versionCount ?? versions.length,
+      content: doc.content,
+      versions,
+      createdAt: toIso(doc.createdAt) ?? new Date(0).toISOString(),
+      updatedAt: toIso(doc.updatedAt) ?? new Date(0).toISOString(),
+    };
+  }
+
   const methods: SuperAdminMethods = {
     getSuperAdminOverview,
     getSuperAdminUsers,
     getSuperAdminConversations,
     getSuperAdminMessages,
+    getSuperAdminDocuments,
+    getSuperAdminDocument,
   };
   return methods;
 }

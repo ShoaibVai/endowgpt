@@ -4,10 +4,14 @@ const { requireJwtAuth, configMiddleware } = require('~/server/middleware');
 const {
   getDocuments,
   getDocument,
+  getDocumentVersions,
   upsertDocument,
   getDocumentVersion,
   restoreDocumentVersion,
   deleteDocument,
+  getUserStorageUsage,
+  reserveDocumentStorage,
+  releaseDocumentStorage,
 } = require('~/models');
 
 const router = express.Router();
@@ -25,11 +29,13 @@ router.use(
     documentMethods: {
       getDocuments,
       getDocument,
+      getDocumentVersions,
       upsertDocument,
       getDocumentVersion,
       restoreDocumentVersion,
       deleteDocument,
     },
+    storageMethods: { getUserStorageUsage, reserveDocumentStorage, releaseDocumentStorage },
     getLimits: (req) => req.config?.documents,
   }),
 );

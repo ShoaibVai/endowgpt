@@ -58,6 +58,7 @@ export {
   createMCPAuthorityDatabaseSourceRevision,
   digestMCPAuthorityValue,
 } from './methods';
+export type { StorageMethods, UserStorageUsage } from './methods';
 export { FAVORITE_ITEM_TYPES } from './types/favorite';
 export {
   AGENT_EVENT_ACTOR_SUMMARY_VERSION,

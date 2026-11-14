@@ -1,5 +1,5 @@
-import { aiEditDocumentText } from './aiEdit';
 import type { AiEditInput } from './aiEdit';
+import { aiEditDocumentText } from './aiEdit';
 
 /** Provider boundary for selection edits (PLAN.md §7.1): one bounded
  *  completion, safe error codes, and no request body or provider text in the
@@ -52,6 +52,7 @@ describe('aiEditDocumentText', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://provider.test/v1/chat/completions');
     expect(calls[0].init.headers).toMatchObject({ Authorization: 'Bearer test-key' });
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
     const body = JSON.parse(String(calls[0].init.body)) as {
       model: string;
       stream: boolean;
@@ -127,5 +128,29 @@ describe('aiEditDocumentText', () => {
     const result = await aiEditDocumentText({ request, apiKey: 'test-key', fetchImpl });
 
     expect(result).toEqual({ ok: false, code: 'ai_edit_unavailable', status: 502 });
+  });
+
+  test('aborts a stalled provider call instead of holding the request open', async () => {
+    const { fetchImpl } = recordingFetch(
+      (init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => {
+            reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+          });
+        }),
+    );
+
+    jest.useFakeTimers();
+    try {
+      const pending = aiEditDocumentText({ request, apiKey: 'test-key', fetchImpl });
+      await jest.advanceTimersByTimeAsync(30_000);
+      await expect(pending).resolves.toEqual({
+        ok: false,
+        code: 'ai_edit_unavailable',
+        status: 502,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

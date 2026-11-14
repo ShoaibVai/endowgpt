@@ -194,3 +194,6 @@ documents:
     - "deepseek-v4.1-flash"
   versionHistoryCap: 50
   autosaveDelayMs: 800
+  # Per-user cap across saved editor documents and generated files (100 MB).
+  # Temporary chat uploads are excluded; their own TTL still applies.
+  storageMaxBytes: 104857600

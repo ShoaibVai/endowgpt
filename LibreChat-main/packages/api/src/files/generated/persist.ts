@@ -5,6 +5,32 @@ import type { GeneratedFileCounts, GeneratedFormat } from './types';
 import type { GeneratedFileLimits } from './limits';
 import { sanitizeGeneratedFilename } from './filename';
 
+export const GENERATED_FILE_STORAGE_CODE = 'storage_quota_exceeded';
+
+/** Generated files are the main consumer of the per-user document budget.
+ *  The message is safe to hand back to the model and tells it what the user
+ *  must do; storage internals stay out of it. */
+export class GeneratedFileStorageQuotaError extends Error {
+  readonly code: string = GENERATED_FILE_STORAGE_CODE;
+  readonly usedBytes: number;
+  readonly limitBytes: number;
+
+  constructor(usedBytes: number, limitBytes: number) {
+    super(
+      `The user's document storage is full (${formatMegabytes(usedBytes)} of ${formatMegabytes(
+        limitBytes,
+      )} used). Ask them to delete older documents or files in My Files or the Documents page, then try again.`,
+    );
+    this.name = 'GeneratedFileStorageQuotaError';
+    this.usedBytes = usedBytes;
+    this.limitBytes = limitBytes;
+  }
+}
+
+function formatMegabytes(bytes: number): string {
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
+
 export type GeneratedFileRecord = Omit<TFile, 'user' | '_id' | '__v' | 'expiredAt'> & {
   user: string;
   __v?: number;
@@ -26,6 +52,11 @@ export type PersistGeneratedFileDependencies = {
   };
   createFile: (data: GeneratedFileRecord, disableTTL?: boolean) => Promise<unknown>;
   deleteStored?: (file: TFile) => Promise<void>;
+  /** Current usage across saved documents and generated files. */
+  getUserStorageUsage?: (args: {
+    userId: string;
+    tenantId?: string;
+  }) => Promise<{ usedBytes: number }>;
   expiredAt?: Date | null;
   logger?: {
     error: (message: string, error?: unknown) => void;
@@ -51,6 +82,8 @@ export type PersistGeneratedFileParams = {
   conversationId?: string;
   messageId?: string;
   limits: GeneratedFileLimits;
+  /** Per-user budget resolved from `documents.storageMaxBytes`. */
+  storageMaxBytes?: number;
 };
 
 function recordToFile(record: GeneratedFileRecord): TFile {
@@ -82,6 +115,21 @@ export async function persistGeneratedFile(
   }
   if (params.buffer.length > params.limits.maxBytes) {
     throw new Error(`The generated file exceeds the ${params.limits.maxBytes} byte limit`);
+  }
+  if (params.storageMaxBytes != null && deps.getUserStorageUsage != null) {
+    let usage: { usedBytes: number };
+    try {
+      usage = await deps.getUserStorageUsage({
+        userId,
+        ...(params.req.user?.tenantId ? { tenantId: params.req.user.tenantId } : {}),
+      });
+    } catch (error) {
+      deps.logger?.error('[persistGeneratedFile] Failed to measure document storage', error);
+      throw new Error('Document storage could not be checked right now. Please try again.');
+    }
+    if (usage.usedBytes + params.buffer.length > params.storageMaxBytes) {
+      throw new GeneratedFileStorageQuotaError(usage.usedBytes, params.storageMaxBytes);
+    }
   }
 
   const { filename } = sanitizeGeneratedFilename(params.filename, [params.format], params.format);

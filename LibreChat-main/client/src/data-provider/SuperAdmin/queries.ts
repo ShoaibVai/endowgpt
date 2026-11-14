@@ -70,6 +70,54 @@ export const useSuperAdminConversationsQuery = (
   );
 };
 
+export const useSuperAdminDocumentsQuery = (
+  params: t.TSuperAdminDocumentsParams,
+  config?: UseQueryOptions<t.TSuperAdminDocumentsResponse>,
+): QueryObserverResult<t.TSuperAdminDocumentsResponse, unknown> => {
+  return useQuery<t.TSuperAdminDocumentsResponse>(
+    [QueryKeys.superAdminDocuments, params],
+    () => dataService.getSuperAdminDocuments(params),
+    {
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      ...config,
+    },
+  );
+};
+
+export const useSuperAdminDocumentQuery = (
+  userId: string | null,
+  conversationId: string | null,
+  artifactId: string | null,
+  config?: UseQueryOptions<t.TSuperAdminDocumentDetail>,
+): QueryObserverResult<t.TSuperAdminDocumentDetail, unknown> => {
+  return useQuery<t.TSuperAdminDocumentDetail>(
+    [QueryKeys.superAdminDocument, userId, conversationId, artifactId],
+    () => dataService.getSuperAdminDocument(userId ?? '', conversationId ?? '', artifactId ?? ''),
+    {
+      enabled: !!userId && !!conversationId && !!artifactId,
+      refetchOnWindowFocus: false,
+      ...config,
+    },
+  );
+};
+
+export const useSuperAdminAuditQuery = (
+  params: t.TSuperAdminAuditParams,
+  config?: UseQueryOptions<t.TSuperAdminAuditResponse>,
+): QueryObserverResult<t.TSuperAdminAuditResponse, unknown> => {
+  return useQuery<t.TSuperAdminAuditResponse>(
+    [QueryKeys.superAdminAudit, params],
+    () => dataService.getSuperAdminAudit(params),
+    {
+      keepPreviousData: true,
+      retry: false,
+      refetchOnWindowFocus: false,
+      ...config,
+    },
+  );
+};
+
 export const useSuperAdminMessagesQuery = (
   userId: string | null,
   conversationId: string | null,

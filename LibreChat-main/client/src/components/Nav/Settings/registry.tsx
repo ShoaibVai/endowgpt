@@ -50,6 +50,7 @@ import ChangeEmail from '../SettingsTabs/Account/ChangeEmail';
 import { RevokeKeys } from '../SettingsTabs/Data/RevokeKeys';
 import { ClearChats } from '../SettingsTabs/Data/ClearChats';
 import { TokenCredits, AutoRefill } from './BillingControls';
+import StorageUsage from '~/components/Storage/StorageUsage';
 import AdminPanel from '../SettingsTabs/General/AdminPanel';
 import SharedLinks from '../SettingsTabs/Data/SharedLinks';
 import ImageResize from '../SettingsTabs/Chat/ImageResize';
@@ -788,6 +789,14 @@ export const registry: SettingEntry[] = [
   },
 
   // Account · Profile
+  {
+    id: 'storageUsage',
+    tab: ACCOUNT,
+    section: 'profile',
+    labelKey: 'com_ui_storage',
+    keywords: ['storage', 'quota', 'documents', 'files', 'disk', 'space'],
+    Component: StorageUsage,
+  },
   {
     id: 'avatar',
     tab: ACCOUNT,

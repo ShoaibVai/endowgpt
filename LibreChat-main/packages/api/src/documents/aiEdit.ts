@@ -6,6 +6,9 @@
 /** The OpenAI-compatible provider for endowGPT models; the credential comes
  *  from the environment only and is never logged or echoed. */
 const DEFAULT_BASE_URL = 'https://opencode.ai/zen/v1';
+/** One provider call may not hold an Express request (and its socket) open
+ *  indefinitely; a timeout maps to the same stable outage code. */
+const AI_EDIT_TIMEOUT_MS = 20_000;
 
 export type AiEditErrorCode =
   | 'ai_edit_rate_limited'
@@ -34,7 +37,8 @@ export interface AiEditInput {
 }
 
 const MODE_GUIDANCE: Record<AiEditInput['request']['mode'], string> = {
-  improve: 'Return an improved version of the text: clearer and more polished, same meaning and length.',
+  improve:
+    'Return an improved version of the text: clearer and more polished, same meaning and length.',
   shorten: 'Return a shorter version that keeps every essential point.',
   expand: 'Return an expanded version that develops the same point in more depth.',
   fix_grammar: 'Return the text with grammar and spelling corrected. Change as little as possible.',
@@ -79,6 +83,8 @@ export async function aiEditDocumentText(input: AiEditInput): Promise<AiEditResu
   }
 
   let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_EDIT_TIMEOUT_MS);
   try {
     response = await doFetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -86,6 +92,7 @@ export async function aiEditDocumentText(input: AiEditInput): Promise<AiEditResu
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: input.request.model,
         stream: false,
@@ -97,6 +104,8 @@ export async function aiEditDocumentText(input: AiEditInput): Promise<AiEditResu
     });
   } catch {
     return { ok: false, code: 'ai_edit_unavailable', status: 502 };
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (!response.ok) {

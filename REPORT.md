@@ -7,6 +7,7 @@ and its RAG API.
 ## What was delivered
 
 ### Deployment (root)
+
 - `docker-compose.yml` — one-command stack: `api` (endowGPT app), `mongodb`,
   `meilisearch`, `rag_api`, `vectordb` (pgvector), `ollama`, `ollama-init`
   (pulls `nomic-embed-text` once, gating rag_api). Health checks on all
@@ -17,6 +18,7 @@ and its RAG API.
   — boot/config/branding/documents/models smoke test.
 
 ### Models
+
 - Single OpenAI-compatible endpoint at `https://opencode.ai/inference/go/openai/v1`,
   credential from env only. One model spec: **endowGPT Fast**
   (`deepseek-v4.1-flash`, default) with `artifacts` + `fileSearch` enabled;
@@ -24,6 +26,7 @@ and its RAG API.
   friendly error copy.
 
 ### Branding (M2)
+
 - Palette applied through the inline deployment theme in `librechat.yaml`
   (light/dark token sets). No custom palette CSS outside two documented
   feature-local cases (splash media backdrop, suggestion mark colors).
@@ -39,6 +42,7 @@ and its RAG API.
   are config-file/worker names and license text.
 
 ### Artifacts + document editor (M3–M5)
+
 - New `application/vnd.endowgpt.document` artifact type with prompt guidance,
   aliases (`document`, `doc`), row kind, and panel dispatch to TipTap.
 - Editor: headings, bold/italic/underline/strike, lists, tables, links, code
@@ -59,30 +63,53 @@ and its RAG API.
   extracted file text into a store-backed document.
 
 ### RAG (M6)
+
 - Stack verified live: pgvector tables created, `nomic-embed-text` pulled via
   ollama-init, embeddings initialized (Ollama), `/health` UP, and LibreChat
   reporting "RAG API is running and reachable". File search runs through the
   ephemeral agents created by the `fileSearch` spec capability; citations UI
   and "Edit this document" import are in place.
 
+### Superadmin portal (M8)
+
+- Read-only `/superadmin` for users holding `access:admin`, with four tabs:
+  **Overview** (users, conversations, messages, input/output/total tokens,
+  daily and per-model usage), **Users** (usage table, search, pagination, and
+  a read-only chat-history dialog), **Documents** (owner, conversation,
+  version count, last update, and full content + version metadata), and
+  **Audit log** (actor, action, target, outcome, severity; search and
+  pagination).
+- `/api/superadmin` carries the portal reads. Token totals use the per-request
+  `transactions` records (including structured cache input/write/read tokens)
+  and fall back to saved message `tokenCount` when a range has no request-level
+  usage. Temporary chats and subagent threads are excluded; `privateText` is
+  never selected.
+- Audit reads reuse the existing admin audit router at
+  `/api/superadmin/audit`, so pagination, filters, CSV export, and chain
+  verification stay in one place. That tab requires the separate
+  `read:audit_log` capability and explains when it is not granted.
+
 ## Verification
 
-| Check | Result |
-|---|---|
-| `docker compose up -d` (all 7 services healthy) | PASS |
-| `/health`, `/api/config` (appTitle=endowGPT) | PASS |
-| Anonymous shell: endowGPT title, favicons, no LibreChat branding | PASS |
-| `/api/documents` mounted, 401 unauthenticated | PASS |
-| Authenticated register/login → model specs with artifacts+fileSearch | PASS |
-| documents upsert / fresh-base update / stale-base 409 / restore / list | PASS (verified live against the running stack) |
-| ai-edit: unknown model → 400; upstream 429 → coded `ai_edit_rate_limited` | PASS |
-| Model smoke (both models, direct to OpenCode) | SKIP — key authenticated, but the upstream free-tier usage quota is exhausted (HTTP 429 `FreeUsageLimitError`, ~18h reset). The wiring itself is proven by the auth pass and the app's mapped error. |
-| Client typecheck (`tsc --noEmit`) | PASS (0 errors in touched code) |
-| API/data-schemas typecheck | PASS (0 errors in touched code; pre-existing upstream spec-file noise untouched) |
-| Jest: markdown round-trip (13), word diff (5), suggestion accept/reject (4), ArtifactTabs (9) | PASS |
-| Jest + mongodb-memory-server: document storage contract (snapshots, conflict, cap pruning, restore appends, scoping) — 10 cases | PASS |
-| Jest: `/api/documents` router contract (auth, validation, 409 mapping, allow-list, caps, 429 budget, coded provider failures) + `/ai-edit` provider mapping — 28 cases | PASS |
-| Client production build (`npm run build:client`) | PASS |
+| Check                                                                                                                                                                  | Result                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker compose up -d` (all 7 services healthy)                                                                                                                        | PASS                                                                                                                                                                                                 |
+| `/health`, `/api/config` (appTitle=endowGPT)                                                                                                                           | PASS                                                                                                                                                                                                 |
+| Anonymous shell: endowGPT title, favicons, no LibreChat branding                                                                                                       | PASS                                                                                                                                                                                                 |
+| `/api/documents` mounted, 401 unauthenticated                                                                                                                          | PASS                                                                                                                                                                                                 |
+| Authenticated register/login → model specs with artifacts+fileSearch                                                                                                   | PASS                                                                                                                                                                                                 |
+| documents upsert / fresh-base update / stale-base 409 / restore / list                                                                                                 | PASS (verified live against the running stack)                                                                                                                                                       |
+| ai-edit: unknown model → 400; upstream 429 → coded `ai_edit_rate_limited`                                                                                              | PASS                                                                                                                                                                                                 |
+| Model smoke (both models, direct to OpenCode)                                                                                                                          | SKIP — key authenticated, but the upstream free-tier usage quota is exhausted (HTTP 429 `FreeUsageLimitError`, ~18h reset). The wiring itself is proven by the auth pass and the app's mapped error. |
+| Client typecheck (`tsc --noEmit`)                                                                                                                                      | PASS (0 errors in touched code)                                                                                                                                                                      |
+| API/data-schemas typecheck                                                                                                                                             | PASS (0 errors in touched code; pre-existing upstream spec-file noise untouched)                                                                                                                     |
+| Jest: markdown round-trip (13), word diff (5), suggestion accept/reject (4), ArtifactTabs (9)                                                                          | PASS                                                                                                                                                                                                 |
+| Jest + mongodb-memory-server: document storage contract (snapshots, conflict, cap pruning, restore appends, scoping) — 10 cases                                        | PASS                                                                                                                                                                                                 |
+| Jest: `/api/documents` router contract (auth, validation, 409 mapping, allow-list, caps, 429 budget, coded provider failures) + `/ai-edit` provider mapping — 28 cases | PASS                                                                                                                                                                                                 |
+| Superadmin storage: transactions vs. message fallback, structured cache tokens, search, document ownership/content                                                     | PASS (6 cases)                                                                                                                                                                                       |
+| Superadmin HTTP: overview, users, conversations, documents, transcript, validation/404/500                                                                             | PASS (9 cases)                                                                                                                                                                                       |
+| Superadmin UI: forbidden, totals/users, documents/audit tabs, transcript                                                                                               | PASS (4 cases)                                                                                                                                                                                       |
+| Client production build (`npm run build:client`)                                                                                                                       | PASS                                                                                                                                                                                                 |
 
 ## Known limitations / notes
 

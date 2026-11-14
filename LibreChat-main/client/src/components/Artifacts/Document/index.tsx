@@ -54,6 +54,11 @@ import VersionsDrawer from './versions';
 import { useLocalize } from '~/hooks';
 import './document.css';
 
+function isStorageQuotaExceeded(error: unknown): boolean {
+  const data = (error as { response?: { data?: { error?: string } } })?.response?.data;
+  return data?.error === 'storage_quota_exceeded';
+}
+
 /* Editor toolbar rounds common writing actions first; the mark edit route
  * (`heading`, lists, table, link, undo/redo) sits in the same row and stays
  * keyboard-reachable. */
@@ -133,8 +138,9 @@ export default function DocumentArtifactTabs({
       const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
       showToast({
         status: 'error',
-        message:
-          status === 409
+        message: isStorageQuotaExceeded(error)
+          ? localize('com_error_document_storage_full')
+          : status === 409
             ? localize('com_ui_document_conflict')
             : localize('com_error_document_save_failed'),
       });
@@ -202,12 +208,14 @@ export default function DocumentArtifactTabs({
               });
             }
           },
-          onError: () => {
+          onError: (error) => {
             savingRef.current = false;
             setIsSaving(false);
             showToast({
               status: 'error',
-              message: localize('com_error_document_save_failed'),
+              message: isStorageQuotaExceeded(error)
+                ? localize('com_error_document_storage_full')
+                : localize('com_error_document_save_failed'),
             });
           },
         },

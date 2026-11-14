@@ -7,9 +7,10 @@ top: one compose file, one env file, and a curated model configuration.
 
 - **Products**: chat with the endowGPT Fast model (Flash when configured), a full
   document editor with AI selection edits and version history, native `.docx` /
-  `.xlsx` / `.pptx` / `.md` file generation, and retrieval-augmented chat with
-  citations. The upstream HTML/React/code artifact system is intentionally removed;
-  old artifact conversations render as ordinary Markdown.
+  `.xlsx` / `.pptx` / `.md` file generation, live web search with citations, and
+  retrieval-augmented chat over uploaded files. HTML code snippets get an inline
+  sandboxed preview. The upstream HTML/React/code artifact system is intentionally
+  removed; old artifact conversations render as ordinary Markdown.
 - **Stack**: Docker Compose · MongoDB · Meilisearch · RAG API · pgvector · Ollama
   (local embeddings).
 
@@ -102,6 +103,14 @@ A request for a real file calls the native tools instead of the editor:
 download. The model is instructed never to answer a file request with HTML, a
 website, or a download-link page.
 
+For live/current questions the model has `web_search` available in every chat and
+is instructed to cite what it finds. Search uses the configured SearXNG instance
+plus the scraper; no extra toggle is needed.
+
+An `html` code fence in a reply gets a Preview/Code control. Preview renders the
+snippet in a sandboxed iframe so a generated page can be inspected without leaving
+the conversation.
+
 The old upstream artifact panel (HTML/React/SVG/Mermaid/code, Preview/Code tabs,
 Sandpack, Monaco, undocking) is gone. A legacy `:::artifact` message is unwrapped
 so its fenced content renders as ordinary Markdown; it never reopens a panel.
@@ -155,17 +164,22 @@ RAG failures surface as a calm, localized notice inside chat.
 
 Users holding the deployment's `access:admin` capability (the first registered
 user is an admin by default) get a **Superadmin** entry in the sidebar and a
-read-only portal at `/superadmin`:
+read-only portal at `/superadmin`, split into four tabs:
 
-- **Usage overview** for 24h / 7d / 30d / all time: total users and active
-  users, conversations, messages, input/output/total tokens, daily usage, and
-  usage by model.
-- **Users table** with per-user conversation/message counts, input/output/total
-  tokens, last activity, and search/pagination.
-- **Chat history** for any user: browse their conversations, then read the
-  message transcript (sender, time, model, tokens, text) without leaving the
-  portal. Temporary chats and subagent threads are excluded, and private
-  message fields are never read.
+- **Overview** for 24h / 7d / 30d / all time: total users and active users,
+  conversations, messages, input/output/total tokens, daily usage, and usage
+  by model.
+- **Users** with per-user conversation/message counts, input/output/total
+  tokens, last activity, search/pagination, and a **Chat history** dialog.
+  Browse any user's conversations, then read the message transcript (sender,
+  time, model, tokens, text). Temporary chats and subagent threads are excluded,
+  and private message fields are never read.
+- **Documents** across the deployment: owner, conversation, version count,
+  last update, and a read-only content viewer.
+- **Audit log**: the existing append-only audit surface, searchable and
+  paginated, with actor, action, target, outcome, and severity. Audit reads
+  require the separate `read:audit_log` capability; without it the tab explains
+  that access has not been granted.
 
 Token totals are summed from the per-request `transactions` records LibreChat
 writes for each model call. If a deployment or date range has no request-level

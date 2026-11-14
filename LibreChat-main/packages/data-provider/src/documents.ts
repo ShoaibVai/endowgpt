@@ -90,10 +90,25 @@ export type TAiEditResponse = z.infer<typeof aiEditResponseSchema>;
 /** Resolved `documents` limits, same shape `startupConfig.documents` reports. */
 export type TDocumentLimits = z.infer<typeof documentsConfigSchema>;
 
+/** How much of the per-user document budget is in use. Counts current document
+ *  content and generated files; version snapshots are excluded. */
+export const documentStorageUsageSchema = z.object({
+  usedBytes: z.number().nonnegative(),
+  limitBytes: z.number().positive(),
+  documentBytes: z.number().nonnegative(),
+  generatedFileBytes: z.number().nonnegative(),
+});
+
+export type TDocumentStorageUsage = z.infer<typeof documentStorageUsageSchema>;
+
 /* ---------------------------------------------------------------- service */
 
 export function getDocuments(): Promise<TDocumentSummary[]> {
   return request.get(endpoints.documents());
+}
+
+export function getDocumentStorage(): Promise<TDocumentStorageUsage> {
+  return request.get(endpoints.documentStorage());
 }
 
 export function getDocument(

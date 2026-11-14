@@ -1,5 +1,5 @@
 import express from 'express';
-import type { DocumentMethods } from '@librechat/data-schemas';
+import type { DocumentMethods, StorageMethods } from '@librechat/data-schemas';
 import type { AddressInfo } from 'node:net';
 import type { AiEditInput, AiEditResult } from './aiEdit';
 import type { DocumentsLimits } from './routes';
@@ -60,12 +60,14 @@ const defaultLimits: DocumentsLimits = {
   importMaxChars: 200000,
   versionHistoryCap: 50,
   autosaveDelayMs: 800,
+  storageMaxBytes: 104_857_600,
   allowedAiEditModels: ['model-a'],
 };
 
 interface MethodStubs {
   getDocuments: jest.Mock;
   getDocument: jest.Mock;
+  getDocumentVersions: jest.Mock;
   upsertDocument: jest.Mock;
   getDocumentVersion: jest.Mock;
   restoreDocumentVersion: jest.Mock;
@@ -77,6 +79,7 @@ function methodStubs(): { methods: DocumentMethods; stubs: MethodStubs } {
   const stubs: MethodStubs = {
     getDocuments: jest.fn(async () => []),
     getDocument: jest.fn(async () => null),
+    getDocumentVersions: jest.fn(async () => []),
     upsertDocument: jest.fn(async () => ({ ok: true, document: makeDocument() })),
     getDocumentVersion: jest.fn(async () => null),
     restoreDocumentVersion: jest.fn(async () => ({ ok: false, code: 'not_found' })),
@@ -90,6 +93,10 @@ function methodStubs(): { methods: DocumentMethods; stubs: MethodStubs } {
 
 interface AppOptions {
   methods: DocumentMethods;
+  storageMethods?: Pick<
+    StorageMethods,
+    'getUserStorageUsage' | 'reserveDocumentStorage' | 'releaseDocumentStorage'
+  >;
   aiEdit?: (input: AiEditInput) => Promise<AiEditResult>;
   user?: string | null;
   limits?: Partial<DocumentsLimits>;
@@ -104,6 +111,15 @@ async function startApp(options: AppOptions): Promise<TestApp> {
   const app = express();
   const limits: DocumentsLimits = { ...defaultLimits, ...options.limits };
   const user = options.user === null ? undefined : { id: options.user ?? 'user-a' };
+  const storageMethods = options.storageMethods ?? {
+    getUserStorageUsage: jest.fn(async () => ({
+      usedBytes: 0,
+      documentBytes: 0,
+      generatedFileBytes: 0,
+    })),
+    reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+    releaseDocumentStorage: jest.fn(async () => undefined),
+  };
 
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -114,6 +130,7 @@ async function startApp(options: AppOptions): Promise<TestApp> {
     '/api/documents',
     createDocumentsRouter({
       documentMethods: options.methods,
+      storageMethods,
       getLimits: () => limits,
       aiEdit: options.aiEdit,
     }),
@@ -211,6 +228,87 @@ describe('GET /api/documents', () => {
   });
 });
 
+describe('GET /api/documents/storage', () => {
+  test('returns usage and the configured limit', async () => {
+    const { methods } = methodStubs();
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 120,
+        documentBytes: 20,
+        generatedFileBytes: 100,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+      releaseDocumentStorage: jest.fn(async () => undefined),
+    };
+    const app = await startApp({ methods, storageMethods, limits: { storageMaxBytes: 1000 } });
+    try {
+      const response = await fetch(`${app.baseUrl}/storage`);
+      expect(response.status).toBe(200);
+      expect(await readJson(response)).toEqual({
+        usedBytes: 120,
+        limitBytes: 1000,
+        documentBytes: 20,
+        generatedFileBytes: 100,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('rejects unauthenticated requests', async () => {
+    const { methods } = methodStubs();
+    const app = await startApp({ methods, user: null });
+    try {
+      const response = await fetch(`${app.baseUrl}/storage`);
+      expect(response.status).toBe(401);
+      expect(await readJson(response)).toEqual({ error: 'unauthorized' });
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('serves repeated meter reads from the short cache', async () => {
+    const { methods } = methodStubs();
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 10,
+        documentBytes: 10,
+        generatedFileBytes: 0,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+      releaseDocumentStorage: jest.fn(async () => undefined),
+    };
+    const app = await startApp({ methods, storageMethods });
+    try {
+      await fetch(`${app.baseUrl}/storage`);
+      await fetch(`${app.baseUrl}/storage`);
+
+      expect(storageMethods.getUserStorageUsage).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('hides accounting failures behind a coded 500', async () => {
+    const { methods } = methodStubs();
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => {
+        throw new Error('mongo down');
+      }),
+      reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+      releaseDocumentStorage: jest.fn(async () => undefined),
+    };
+    const app = await startApp({ methods, storageMethods });
+    try {
+      const response = await fetch(`${app.baseUrl}/storage`);
+      expect(response.status).toBe(500);
+      expect(await readJson(response)).toEqual({ error: 'storage_usage_failed' });
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 describe('GET /api/documents/:conversationId/:artifactId', () => {
   test('returns the wire document with epoch timestamps and a version id', async () => {
     const { methods, stubs } = methodStubs();
@@ -221,6 +319,9 @@ describe('GET /api/documents/:conversationId/:artifactId', () => {
         lastVersionId: undefined,
       }),
     );
+    stubs.getDocumentVersions.mockResolvedValue([
+      { id: 'version-1', title: 'Draft', createdAt: CREATED, source: 'user' },
+    ]);
     const app = await startApp({ methods });
     try {
       const response = await fetch(`${app.baseUrl}/convo-1/artifact-1`);
@@ -292,6 +393,9 @@ describe('PUT /api/documents/:conversationId/:artifactId', () => {
       ok: true,
       document: makeDocument({ title: 'Saved', content: '# Saved' }),
     });
+    stubs.getDocumentVersions.mockResolvedValue([
+      { id: 'version-1', title: 'Saved', createdAt: CREATED, source: 'user' },
+    ]);
     const app = await startApp({ methods, limits: { versionHistoryCap: 7 } });
     try {
       const response = await fetch(
@@ -306,7 +410,11 @@ describe('PUT /api/documents/:conversationId/:artifactId', () => {
       const body = await readJson(response);
 
       expect(response.status).toBe(200);
-      expect(body).toMatchObject({ title: 'Saved', content: '# Saved' });
+      expect(body).toMatchObject({
+        title: 'Saved',
+        content: '# Saved',
+        versions: [{ id: 'version-1', title: 'Saved' }],
+      });
       expect(stubs.upsertDocument).toHaveBeenCalledWith({
         userId: 'user-a',
         conversationId: 'convo-1',
@@ -343,6 +451,130 @@ describe('PUT /api/documents/:conversationId/:artifactId', () => {
       await app.close();
     }
   });
+
+  test('rejects a save that would exceed the per-user storage cap', async () => {
+    const { methods, stubs } = methodStubs();
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 95,
+        documentBytes: 95,
+        generatedFileBytes: 0,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({
+        ok: false as const,
+        usage: { usedBytes: 95, documentBytes: 95, generatedFileBytes: 0 },
+      })),
+      releaseDocumentStorage: jest.fn(async () => undefined),
+    };
+    const app = await startApp({
+      methods,
+      storageMethods,
+      limits: { storageMaxBytes: 100 },
+    });
+    try {
+      const response = await fetch(
+        `${app.baseUrl}/convo-1/artifact-1`,
+        putJson({ title: 'Draft', content: '123456' }),
+      );
+
+      expect(response.status).toBe(413);
+      expect(await readJson(response)).toEqual({
+        error: 'storage_quota_exceeded',
+        usedBytes: 95,
+        limitBytes: 100,
+      });
+      expect(storageMethods.reserveDocumentStorage).toHaveBeenCalledWith({
+        userId: 'user-a',
+        bytes: 6,
+        limit: 100,
+      });
+      expect(stubs.upsertDocument).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('releases the shrink and never re-reads the whole document', async () => {
+    const { methods, stubs } = methodStubs();
+    const releaseDocumentStorage = jest.fn(async () => undefined);
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 95,
+        documentBytes: 95,
+        generatedFileBytes: 0,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+      releaseDocumentStorage,
+    };
+    stubs.getDocument.mockResolvedValue(makeDocument({ content: 'a'.repeat(90) }));
+    stubs.upsertDocument.mockResolvedValue({
+      ok: true,
+      document: makeDocument({ content: 'bbbbbbbbbb' }),
+    });
+    const app = await startApp({
+      methods,
+      storageMethods,
+      limits: { storageMaxBytes: 100 },
+    });
+    try {
+      const response = await fetch(
+        `${app.baseUrl}/convo-1/artifact-1`,
+        putJson({ title: 'Draft', content: 'bbbbbbbbbb' }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(stubs.upsertDocument).toHaveBeenCalledTimes(1);
+      expect(storageMethods.reserveDocumentStorage).not.toHaveBeenCalled();
+      expect(releaseDocumentStorage).toHaveBeenCalledWith({ userId: 'user-a', bytes: 80 });
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('passes the row it already read to the storage layer', async () => {
+    const { methods, stubs } = methodStubs();
+    const existing = makeDocument({ content: '# Hello' });
+    stubs.getDocument.mockResolvedValue(existing);
+    const app = await startApp({ methods });
+    try {
+      const response = await fetch(
+        `${app.baseUrl}/convo-1/artifact-1`,
+        putJson({ title: 'Draft', content: '# Hello' }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(stubs.upsertDocument).toHaveBeenCalledWith(expect.objectContaining({ existing }));
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('quota checks bypass the cached meter and invalidate it', async () => {
+    const { methods } = methodStubs();
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 0,
+        documentBytes: 0,
+        generatedFileBytes: 0,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+      releaseDocumentStorage: jest.fn(async () => undefined),
+    };
+    const app = await startApp({ methods, storageMethods });
+    try {
+      await fetch(`${app.baseUrl}/storage`);
+      await fetch(
+        `${app.baseUrl}/convo-1/artifact-1`,
+        putJson({ title: 'Draft', content: '# Hello' }),
+      );
+      await fetch(`${app.baseUrl}/storage`);
+
+      expect(storageMethods.reserveDocumentStorage).toHaveBeenCalledTimes(1);
+      expect(storageMethods.getUserStorageUsage).toHaveBeenCalledTimes(2);
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 describe('DELETE /api/documents/:conversationId/:artifactId', () => {
@@ -357,6 +589,31 @@ describe('DELETE /api/documents/:conversationId/:artifactId', () => {
       expect(deleted.status).toBe(204);
       expect(missing.status).toBe(404);
       expect(await readJson(missing)).toEqual({ error: 'document_not_found' });
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('releases the deleted document bytes from the counter', async () => {
+    const { methods, stubs } = methodStubs();
+    const releaseDocumentStorage = jest.fn(async () => undefined);
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 0,
+        documentBytes: 0,
+        generatedFileBytes: 0,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({ ok: true as const })),
+      releaseDocumentStorage,
+    };
+    stubs.getDocument.mockResolvedValue(makeDocument({ content: '12345' }));
+    stubs.deleteDocument.mockResolvedValue(true);
+    const app = await startApp({ methods, storageMethods });
+    try {
+      const response = await fetch(`${app.baseUrl}/convo-1/artifact-1`, { method: 'DELETE' });
+
+      expect(response.status).toBe(204);
+      expect(releaseDocumentStorage).toHaveBeenCalledWith({ userId: 'user-a', bytes: 5 });
     } finally {
       await app.close();
     }
@@ -391,6 +648,11 @@ describe('document versions', () => {
 
   test('validates the restore payload and maps a missing version to 404', async () => {
     const { methods, stubs } = methodStubs();
+    stubs.getDocumentVersion.mockImplementation(async (params: { versionId: string }) =>
+      params.versionId === 'version-1'
+        ? { id: 'version-1', title: 'Draft', content: '# Old', createdAt: CREATED }
+        : null,
+    );
     stubs.restoreDocumentVersion
       .mockResolvedValueOnce({ ok: true, document: makeDocument({ content: '# Old' }) })
       .mockResolvedValueOnce({ ok: false, code: 'not_found' });
@@ -414,6 +676,49 @@ describe('document versions', () => {
       expect(await readJson(restored)).toMatchObject({ content: '# Old' });
       expect(missing.status).toBe(404);
       expect(await readJson(missing)).toEqual({ error: 'version_not_found' });
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('rejects a restore that would exceed the per-user storage cap', async () => {
+    const { methods, stubs } = methodStubs();
+    const storageMethods = {
+      getUserStorageUsage: jest.fn(async () => ({
+        usedBytes: 95,
+        documentBytes: 95,
+        generatedFileBytes: 0,
+      })),
+      reserveDocumentStorage: jest.fn(async () => ({
+        ok: false as const,
+        usage: { usedBytes: 95, documentBytes: 95, generatedFileBytes: 0 },
+      })),
+      releaseDocumentStorage: jest.fn(async () => undefined),
+    };
+    stubs.getDocumentVersion.mockResolvedValue({
+      id: 'version-1',
+      title: 'Draft',
+      content: '1234567890',
+      createdAt: CREATED,
+    });
+    const app = await startApp({
+      methods,
+      storageMethods,
+      limits: { storageMaxBytes: 100 },
+    });
+    try {
+      const response = await fetch(
+        `${app.baseUrl}/convo-1/artifact-1/restore`,
+        postJson({ versionId: 'version-1' }),
+      );
+
+      expect(response.status).toBe(413);
+      expect(await readJson(response)).toEqual({
+        error: 'storage_quota_exceeded',
+        usedBytes: 95,
+        limitBytes: 100,
+      });
+      expect(stubs.restoreDocumentVersion).not.toHaveBeenCalled();
     } finally {
       await app.close();
     }

@@ -81,6 +81,11 @@ jest.mock('~/components/Nav/AccountSettings', () => ({
   default: () => <div data-testid="account-settings" />,
 }));
 
+jest.mock('~/components/Storage/StorageIndicator', () => ({
+  __esModule: true,
+  default: () => <div data-testid="storage-indicator" />,
+}));
+
 import ExpandedPanel from '../ExpandedPanel';
 
 const createLinks = (): NavLink[] => [
@@ -222,6 +227,13 @@ describe('ExpandedPanel', () => {
       expect(screen.getByTestId('close-sidebar-button')).toHaveClass('hover:bg-surface-nav-hover');
       expect(screen.getByTestId('new-chat-button')).toHaveClass('hover:bg-surface-nav-hover');
       expect(screen.getByTestId('new-chat-button')).not.toHaveClass('hover:bg-surface-hover');
+    });
+
+    it('shows the storage indicator above the account controls', () => {
+      renderPanel({ expanded: true });
+
+      expect(screen.getByTestId('storage-indicator')).toBeInTheDocument();
+      expect(screen.getByTestId('account-settings')).toBeInTheDocument();
     });
   });
 

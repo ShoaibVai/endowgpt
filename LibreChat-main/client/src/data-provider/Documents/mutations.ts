@@ -53,6 +53,7 @@ export const useRestoreDocumentMutation = (
         [QueryKeys.documents, conversationId, artifactId],
         data,
       );
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.documentStorage] });
       onSuccess?.(data, variables, context);
     },
     ...options,
@@ -83,6 +84,7 @@ export const useDeleteDocumentMutation = (
     onError,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.documents] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.documentStorage] });
       queryClient.removeQueries({
         queryKey: [QueryKeys.documents, variables.conversationId, variables.artifactId],
       });

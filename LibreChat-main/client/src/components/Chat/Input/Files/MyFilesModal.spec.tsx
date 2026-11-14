@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MyFilesModal } from './MyFilesModal';
 
 jest.mock('~/data-provider', () => ({
   useGetFiles: () => ({ data: [] }),
+  useGetDocumentStorageQuery: () => ({ data: undefined }),
 }));
 
 jest.mock('~/hooks', () => ({
@@ -18,7 +20,11 @@ jest.mock('./Table', () => ({
 
 function Harness({ trigger }: { trigger: HTMLElement }) {
   const [open, setOpen] = useState(true);
-  return <MyFilesModal open={open} onOpenChange={setOpen} triggerRef={{ current: trigger }} />;
+  return (
+    <MemoryRouter>
+      <MyFilesModal open={open} onOpenChange={setOpen} triggerRef={{ current: trigger }} />
+    </MemoryRouter>
+  );
 }
 
 describe('MyFilesModal focus restoration', () => {

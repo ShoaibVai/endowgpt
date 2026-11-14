@@ -1,12 +1,7 @@
 import type { Types, Document } from 'mongoose';
 
 /** What produced a document version snapshot. */
-export type DocumentVersionSource =
-  | 'model'
-  | 'user'
-  | 'ai_edit'
-  | 'restore'
-  | 'import';
+export type DocumentVersionSource = 'model' | 'user' | 'ai_edit' | 'restore' | 'import';
 
 export interface IDocumentVersion {
   id: string;
@@ -24,10 +19,31 @@ export interface IDocument extends Document {
   content: string;
   /** The newest snapshot id, so a save can detect "changed elsewhere". */
   lastVersionId?: string;
+  /** Number of snapshots in the `documentversions` collection. */
+  versionCount?: number;
+  /** UTF-8 size of `content`, maintained on write for quota accounting. */
+  contentBytes?: number;
+  /** Legacy rows still carry embedded snapshots until their next write. */
   versions?: IDocumentVersion[];
   tenantId?: string;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+/** What version lists and document payloads carry: no snapshot body. */
+export type IDocumentVersionMeta = Omit<IDocumentVersion, 'content'>;
+
+/** One snapshot row in the `documentversions` collection. */
+export interface IDocumentVersionRecord {
+  user: Types.ObjectId;
+  conversationId: string;
+  artifactId: string;
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  source: string;
+  tenantId?: string;
 }
 
 export interface IDocumentLean {
@@ -51,6 +67,9 @@ export interface DocumentUpsertParams {
   baseVersionId?: string;
   /** Hard cap on stored snapshots (the oldest is pruned beyond it). */
   versionHistoryCap?: number;
+  /** Already-loaded current row, so a caller that read it for quota checks
+   *  does not make the storage layer read it again. */
+  existing?: IDocument | null;
 }
 
 export type DocumentUpsertResult =

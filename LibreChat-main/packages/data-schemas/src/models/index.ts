@@ -13,9 +13,11 @@ import { createSubagentContentModel } from './subagentContent';
 import { createSkillSyncStatusModel } from './skillSyncStatus';
 import { createConversationTagModel } from './conversationTag';
 import { createCodeEnvironmentModel } from './codeEnvironment';
+import { createDocumentVersionModel } from './documentVersion';
 import { createSkillDeletionModel } from './skillDeletion';
 import { createAgentCategoryModel } from './agentCategory';
 import { createResourceLockModel } from './resourceLock';
+import { createStorageUsageModel } from './storageUsage';
 import { createChatProjectModel } from './chatProject';
 import { createAgentApiKeyModel } from './agentApiKey';
 import { createTransactionModel } from './transaction';
@@ -25,11 +27,11 @@ import { createPluginAuthModel } from './pluginAuth';
 import { createSharedLinkModel } from './sharedLink';
 import { createAccessRoleModel } from './accessRole';
 import { createToolFavoriteModel } from './favorite';
-import { createDocumentModel } from './document';
 import { createMCPServerModel } from './mcpServer';
 import { createAssistantModel } from './assistant';
 import { createSkillFileModel } from './skillFile';
 import { createConversationModel } from './convo';
+import { createDocumentModel } from './document';
 import { createToolCallModel } from './toolCall';
 import { createAclEntryModel } from './aclEntry';
 import { createAuditLogModel } from './auditLog';
@@ -95,6 +97,8 @@ export function createModels(mongoose: typeof import('mongoose')): {
   MemoryEntry: ReturnType<typeof createMemoryModel>;
   ToolFavorite: ReturnType<typeof createToolFavoriteModel>;
   Document: ReturnType<typeof createDocumentModel>;
+  DocumentVersion: ReturnType<typeof createDocumentVersionModel>;
+  StorageUsage: ReturnType<typeof createStorageUsageModel>;
   AccessRole: ReturnType<typeof createAccessRoleModel>;
   AclEntry: ReturnType<typeof createAclEntryModel>;
   SystemGrant: ReturnType<typeof createSystemGrantModel>;
@@ -151,6 +155,8 @@ export function createModels(mongoose: typeof import('mongoose')): {
     MemoryEntry: createMemoryModel(mongoose),
     ToolFavorite: createToolFavoriteModel(mongoose),
     Document: createDocumentModel(mongoose),
+    DocumentVersion: createDocumentVersionModel(mongoose),
+    StorageUsage: createStorageUsageModel(mongoose),
     AccessRole: createAccessRoleModel(mongoose),
     AclEntry: createAclEntryModel(mongoose),
     SystemGrant: createSystemGrantModel(mongoose),
