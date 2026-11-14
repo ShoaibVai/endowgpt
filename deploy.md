@@ -9,6 +9,11 @@ It covers two targets:
 1. [Local deployment](#part-a---local-deployment-docker-desktop) — your machine, for development and evaluation.
 2. [Hostinger VPS deployment](#part-b---hostinger-vps-deployment) — Ubuntu 24.04 with a TLS reverse proxy.
 
+> **Deploying to endowhub.io?** Use `deploy-endowhub.md` instead. It is this
+> stack cloned from GitHub into `/var/www/endowhub.io` on `187.53.138.42`, with
+> a read-only deploy key and `git pull`-based updates. This file remains the
+> generic runbook (`/opt/endowgpt`, user `deploy`, `chat.example.com`).
+>
 > `docs/VPS_DEPLOY.md` remains the deep reference for the web-search layer
 > (network isolation, SSRF checks, scraper switching, benchmarks). This file is
 > the end-to-end runbook for the full stack.
