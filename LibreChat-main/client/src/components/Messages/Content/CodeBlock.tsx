@@ -17,6 +17,57 @@ type CodeBlockProps = Pick<
   classProp?: string;
 };
 
+const HTML_LANGUAGES = new Set(['html', 'htm', 'html5', 'xhtml']);
+
+const isHtmlLanguage = (lang?: string): boolean =>
+  lang != null && HTML_LANGUAGES.has(lang.toLowerCase());
+
+/** Syntax highlighting hands us React elements, so the raw source is the
+ *  concatenated text of their children. */
+const textFromChildren = (node: React.ReactNode): string => {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(textFromChildren).join('');
+  }
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return textFromChildren(node.props.children);
+  }
+  return '';
+};
+
+/** Sandboxed previews have an opaque origin, where reading `localStorage`
+ *  throws. Generated pages commonly keep a best score there, and the throw
+ *  aborts the rest of their script (no board, no handlers). An in-memory
+ *  shim keeps the sandbox's origin isolation while letting those pages run. */
+const PREVIEW_STORAGE_SHIM = `<script>(function(){function createStore(){var data={};return {getItem:function(key){return Object.prototype.hasOwnProperty.call(data,key)?data[key]:null;},setItem:function(key,value){data[key]=String(value);},removeItem:function(key){delete data[key];},clear:function(){data={};},key:function(index){return Object.keys(data)[index]||null;},get length(){return Object.keys(data).length;}};}try{if(window.localStorage){return;}}catch(error){}try{Object.defineProperty(window,'localStorage',{configurable:true,value:createStore()});}catch(error){}try{Object.defineProperty(window,'sessionStorage',{configurable:true,value:createStore()});}catch(error){}})();</script>`;
+
+const withPreviewShim = (html: string): string => {
+  if (!html || !/<script[\s>]/i.test(html)) {
+    return html;
+  }
+  const insert = (index: number) =>
+    `${html.slice(0, index)}${PREVIEW_STORAGE_SHIM}${html.slice(index)}`;
+  const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
+  if (doctype) {
+    return insert(doctype.index + doctype[0].length);
+  }
+  const head = /<head[^>]*>/i.exec(html);
+  if (head) {
+    return insert(head.index + head[0].length);
+  }
+  const htmlTag = /<html[^>]*>/i.exec(html);
+  if (htmlTag) {
+    return insert(htmlTag.index + htmlTag[0].length);
+  }
+  const body = /<body[^>]*>/i.exec(html);
+  if (body) {
+    return insert(body.index + body[0].length);
+  }
+  return `<!DOCTYPE html><html><head>${PREVIEW_STORAGE_SHIM}</head><body>${html}</body></html>`;
+};
+
 const CodeBlock: React.FC<CodeBlockProps> = ({
   lang,
   blockIndex,
@@ -30,13 +81,18 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
   const codeRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const codeBarRef = useRef<HTMLDivElement>(null);
+  const codeText = useMemo(() => textFromChildren(codeChildren), [codeChildren]);
+  const isNonCode = !!(plugin === true || error === true);
+  const language = isNonCode ? 'json' : lang;
+  const isHtml = !isNonCode && isHtmlLanguage(language);
+  const isHtmlDocument = isHtml && /<!doctype\s+html|<html[\s>]/i.test(codeText);
   const [isHovered, setIsHovered] = useState(false);
   const [isCodeBarVisible, setIsCodeBarVisible] = useState(true);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState('');
+  const [showPreview, setShowPreview] = useState(isHtmlDocument);
+  const [previewHtml, setPreviewHtml] = useState(isHtmlDocument ? codeText : '');
 
   const toolCallsMap = useToolCallsMapContext();
-  const { messageId, partIndex } = useMessageContext();
+  const { messageId, partIndex, isSubmitting } = useMessageContext();
   const key = allowExecution
     ? `${messageId}_${partIndex ?? 0}_${blockIndex ?? 0}_${Tools.execute_code}`
     : '';
@@ -96,21 +152,34 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
     }
   }, [currentIndex]);
 
-  const isNonCode = !!(plugin === true || error === true);
-  const language = isNonCode ? 'json' : lang;
-  const isHtml = !isNonCode && (language === 'html' || language === 'htm');
   const showHtmlPreview = isHtml && showPreview;
   const showFloating = isHovered && !isCodeBarVisible;
 
-  /** Syntax highlighting hands us React elements, so the DOM's own text is the
-   *  only faithful source for the preview. Read it when the preview opens,
-   *  while the code panel is still in the document. */
+  /** The source is already in hand; the DOM is only a fallback for children
+   *  that syntax highlighting may have left as non-text nodes. */
   const togglePreview = useCallback(() => {
     if (!showPreview) {
-      setPreviewHtml(codeRef.current?.textContent ?? '');
+      setPreviewHtml(codeText || codeRef.current?.textContent || '');
     }
     setShowPreview((active) => !active);
-  }, [showPreview]);
+  }, [showPreview, codeText]);
+
+  /** Streaming rewrites the source token by token; reloading the iframe each
+   *  time would flicker and restart any script. Refresh once it settles. */
+  useEffect(() => {
+    if (!showPreview || isSubmitting === true) {
+      return;
+    }
+    setPreviewHtml(codeText || codeRef.current?.textContent || '');
+  }, [showPreview, isSubmitting, codeText]);
+
+  useEffect(() => {
+    if (isHtml) {
+      return;
+    }
+    setShowPreview(false);
+    setPreviewHtml('');
+  }, [isHtml]);
 
   return (
     <div
@@ -136,10 +205,13 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
       {showHtmlPreview && (
         <iframe
           title={localize('com_ui_preview')}
-          srcDoc={previewHtml}
+          srcDoc={withPreviewShim(previewHtml)}
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
-          className="bg-surface-primary h-[24rem] w-full border-0"
+          className={cn(
+            'bg-surface-primary w-full border-0',
+            isHtmlDocument ? 'h-[40rem] max-h-[80vh]' : 'h-[24rem] max-h-[70vh]',
+          )}
           data-testid="html-code-preview"
         />
       )}
@@ -167,6 +239,8 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
         blockIndex={blockIndex}
         plugin={plugin === true}
         allowExecution={allowExecution}
+        previewActive={showPreview}
+        onTogglePreview={isHtml ? togglePreview : undefined}
         isVisible={showFloating}
       />
       {allowExecution === true && toolCalls && toolCalls.length > 0 && (

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Code2, Eye, InfoIcon } from 'lucide-react';
+import { InfoIcon } from 'lucide-react';
 import type { CodeBarProps } from '~/common';
 import useDownloadCode from '~/components/Messages/Content/useDownloadCode';
 import DownloadButton from '~/components/Messages/Content/DownloadButton';
+import PreviewButton from '~/components/Messages/Content/PreviewButton';
 import useCopyCode from '~/components/Messages/Content/useCopyCode';
 import CopyButton from '~/components/Messages/Content/CopyButton';
 import LangIcon from '~/components/Messages/Content/LangIcon';
@@ -35,20 +36,7 @@ const CodeBar: React.FC<CodeBarProps> = React.memo(
         ) : (
           <div className="flex items-center justify-center gap-2">
             {onTogglePreview != null && (
-              <button
-                type="button"
-                onClick={onTogglePreview}
-                aria-pressed={previewActive}
-                aria-label={localize(previewActive ? 'com_ui_code' : 'com_ui_preview')}
-                title={localize(previewActive ? 'com_ui_code' : 'com_ui_preview')}
-                className="text-text-secondary hover:text-text-primary focus-visible:ring-border-xheavy rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
-              >
-                {previewActive ? (
-                  <Code2 className="size-4" aria-hidden="true" />
-                ) : (
-                  <Eye className="size-4" aria-hidden="true" />
-                )}
-              </button>
+              <PreviewButton active={previewActive} onToggle={onTogglePreview} />
             )}
             {allowExecution === true && (
               <RunCode lang={lang} codeRef={codeRef} blockIndex={blockIndex} />

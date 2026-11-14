@@ -3,6 +3,7 @@ import { InfoIcon } from 'lucide-react';
 import type { CodeBarProps } from '~/common';
 import useDownloadCode from '~/components/Messages/Content/useDownloadCode';
 import DownloadButton from '~/components/Messages/Content/DownloadButton';
+import PreviewButton from '~/components/Messages/Content/PreviewButton';
 import useCopyCode from '~/components/Messages/Content/useCopyCode';
 import CopyButton from '~/components/Messages/Content/CopyButton';
 import RunCode from '~/components/Messages/Content/RunCode';
@@ -13,7 +14,17 @@ interface FloatingCodeBarProps extends CodeBarProps {
 }
 
 const FloatingCodeBar: React.FC<FloatingCodeBarProps> = React.memo(
-  ({ lang, error, codeRef, blockIndex, plugin = null, allowExecution = true, isVisible }) => {
+  ({
+    lang,
+    error,
+    codeRef,
+    blockIndex,
+    plugin = null,
+    allowExecution = true,
+    previewActive = false,
+    onTogglePreview,
+    isVisible,
+  }) => {
     const { isCopied, buttonRef, handleCopy } = useCopyCode(codeRef);
     const {
       isDownloaded,
@@ -32,6 +43,14 @@ const FloatingCodeBar: React.FC<FloatingCodeBarProps> = React.memo(
           <InfoIcon className="text-text-secondary flex h-4 w-4 gap-2" />
         ) : (
           <>
+            {onTogglePreview != null && (
+              <PreviewButton
+                active={previewActive}
+                onToggle={onTogglePreview}
+                tabIndex={isVisible ? 0 : -1}
+                className="bg-surface-code border-border-inset rounded border px-2 py-1"
+              />
+            )}
             {allowExecution === true && (
               <RunCode lang={lang} codeRef={codeRef} blockIndex={blockIndex} iconOnly />
             )}

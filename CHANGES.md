@@ -41,7 +41,7 @@ sandbox.
 | Spreadsheet preview     | The viewer reads its CSS modules by their real `spreadsheet-*` keys; workbook-driven column widths now render as side-by-side columns instead of a single stacked column.                                                                                                                                                                     |
 | File preview scrolling  | Spreadsheet, DOCX, Markdown, PDF, and legacy text previews share a `preview-scroll` container with a full-size 8px horizontal/vertical thumb and track, so wide sheets and long documents have an obvious scrollbar.                                                                                                                          |
 | Web search              | `webSearch: true` on the model spec puts `web_search` in every normal chat; `webSearchPrompt` tells the model to use it for current/live questions and to cite sources. `start.bat`/`stop.bat` now include the websearch overlay so SearXNG, the scraper, and the API's search environment exist on every launch. The composer stays minimal rather than restoring the developer tool palette. |
-| HTML preview            | `html`/`htm` code fences get a Preview/Code toggle in the code bar. Preview reads the highlighted code block's DOM text and renders it in a sandboxed `iframe` (`allow-scripts`, no same-origin) while copy/download keep working against the hidden source. |
+| HTML preview            | `html`/`htm`/`html5`/`xhtml` code fences get a labeled Preview/Code toggle in the top and floating code bars. Complete documents (`<!DOCTYPE html>` / `<html>`) open as a preview by default. Preview renders the highlighted source in a sandboxed `iframe` (`allow-scripts`, no same-origin) with an in-memory `localStorage`/`sessionStorage` shim injected before page scripts, so pages that persist a best score at top level keep running; the snapshot refreshes when streaming settles. Copy/download keep working against the hidden source. |
 | Message spacing         | Generated-file card groups and tool-output artifact groups use `gap-3`, so consecutive files no longer touch.                                                                                                                                                                                                                                  |
 | Login logo              | The auth lockup uses `max-h-20` instead of `max-h-16`, preserving the 1410/286 aspect ratio instead of cropping the wordmark vertically.                                                                                                                                                                                                       |
 
@@ -141,6 +141,11 @@ sandbox.
 | `client/src/locales/en/translation.json`                             | M8        | superadmin copy keys                                                                                                          |
 | `packages/api/src/prompts/files/index.ts`                            | M9        | firm file-request guidance: native tools, no HTML/download page, one call per file                                            |
 | `scripts/smoke-files.mjs` (repo root)                                | M9        | authenticated smoke for the md+docx+xlsx prompt and Excel/PPTX/Word variants                                                  |
+| `client/src/components/Messages/Content/CodeBlock.tsx`               | M9.3      | HTML preview: alias detection, auto-open for complete documents, storage shim, snapshot refresh                               |
+| `client/src/components/Messages/Content/PreviewButton.tsx`           | M9.3      | labeled Preview/Code toggle shared by the top and floating code bars (new file)                                              |
+| `client/src/components/Messages/Content/CodeBar.tsx`                 | M9.3      | uses the labeled preview toggle instead of an icon-only control                                                              |
+| `client/src/components/Messages/Content/FloatingCodeBar.tsx`         | M9.3      | exposes the preview toggle while scrolled inside a long code block                                                           |
+| `client/src/components/Messages/Content/__tests__/CodeBlock.preview.test.tsx` | M9.3 | auto-open, shim ordering, snapshot refresh, and language-alias coverage (new file)                                    |
 
 ## Brand-asset findings (recorded for future maintainers)
 
@@ -209,11 +214,13 @@ LibreChat reaches it through `RAG_API_URL` plus the `fileSearch` capability.
   finished.
 - **M9.3** — restored web search and HTML preview: the model spec enables
   `web_search` everywhere, `webSearchPrompt` covers live/current questions and
-  citations, HTML code fences gain a sandboxed Preview/Code toggle that reads
-  the highlighted DOM text, generated file cards get 12px spacing, and the auth
-  lockup no longer crops vertically. The Windows launchers now include the
-  websearch overlay, which is what supplies the API's SearXNG/scraper
-  environment and network membership.
+  citations, HTML code fences (including `HTML`/`html5`/`xhtml` aliases) gain a
+  visible Preview/Code toggle in both the top and floating code bars, complete
+  documents auto-open the preview, and a sandboxed storage shim lets generated
+  pages call `localStorage` without dying under the iframe's opaque origin.
+  Generated file cards get 12px spacing, and the auth lockup no longer crops
+  vertically. The Windows launchers now include the websearch overlay, which is
+  what supplies the API's SearXNG/scraper environment and network membership.
 - **M9.2** — file-preview scrolling: the app-wide horizontal scrollbar is a
   near-invisible `0.1em`; generated-file viewers now use a shared
   `preview-scroll` class with an 8px thumb/track, including the spreadsheet's
