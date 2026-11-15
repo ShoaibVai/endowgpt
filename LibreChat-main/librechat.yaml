@@ -15,6 +15,26 @@ cache: true
 fileStrategy: "local"
 
 # -----------------------------------------------------------------------------
+# Attachments
+# -----------------------------------------------------------------------------
+# The inference gateway behind `endowGPT` speaks OpenAI's chat API but does NOT
+# accept OpenAI `file` content parts: it answers
+#   "file content parts are not supported here; send the image as an image_url part"
+# LibreChat's system default sends `application/pdf` down the native "provider"
+# path, which `formatDocumentBlock` renders as `{ type: 'file', file: {...} }`
+# for any OpenAI-compatible endpoint. A turn that replays the document then fails
+# on every retry, so the conversation cannot be continued.
+#
+# Deliver PDFs as extracted text instead: the upload parses them (RAG /text, and
+# the built-in pdfjs parser if RAG has no extraction) and the turn injects that
+# text as file context. Images keep the native `image_url` path, which the
+# gateway does support; every other type already defaults to text.
+fileConfig:
+  defaultLLMDeliveryPath:
+    overrides:
+      application/pdf: text
+
+# -----------------------------------------------------------------------------
 # Default capabilities
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
