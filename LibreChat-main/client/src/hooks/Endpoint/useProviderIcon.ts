@@ -16,8 +16,9 @@ export interface ProviderIconParams {
 
 /**
  * Single source of truth for which art a given endpoint renders. Precedence, highest
- * first: an image iconURL, an iconURL naming a provider, the server resolved
- * providerId, the first-class endpoint mapping, then the endpoint name.
+ * first: an image iconURL, an iconURL naming a provider, the endpoint's own configured
+ * image iconURL, the server resolved providerId, the first-class endpoint mapping, then
+ * the endpoint name.
  */
 export function resolveProviderIcon({
   endpoint,
@@ -34,6 +35,14 @@ export function resolveProviderIcon({
   const declared = resolveProviderId(candidate);
   if (declared) {
     return { provider: declared, imageURL: null };
+  }
+
+  /**
+   * A legacy iconURL that names neither an image nor a provider (older conversations
+   * stored the endpoint label) must not mask the endpoint's own configured art.
+   */
+  if (candidate !== configured && isImageURL(configured)) {
+    return { provider: null, imageURL: configured };
   }
 
   const served = getEndpointField(endpointsConfig, endpoint, 'providerId');

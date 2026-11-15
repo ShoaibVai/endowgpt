@@ -83,6 +83,9 @@ modelSpecs:
     - name: "deepseek-v4.1-flash"
       label: "endowGPT Fast"
       description: "Fast everyday chat, editing, and document drafting."
+      # Product mark; also stops the shared provider registry from matching the
+      # upstream model id and attributing the spec to another vendor.
+      iconURL: "/assets/endowgpt-mark.png"
       preset:
         endpoint: "endowGPT"
         model: "deepseek-v4.1-flash"

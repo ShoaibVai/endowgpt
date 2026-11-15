@@ -32,6 +32,13 @@ describe('useProviderIcon', () => {
     expect(run('Declared')).toEqual({ provider: ProviderId.mistral, imageURL: null });
   });
 
+  it('falls back to the endpoint image when a stored iconURL names nothing', () => {
+    expect(run('Branded', 'endowGPT')).toEqual({
+      provider: null,
+      imageURL: 'https://cdn.example.com/x.png',
+    });
+  });
+
   it('rule 3: the server resolved providerId is used when no iconURL applies', () => {
     expect(run('My OpenRouter')).toEqual({ provider: ProviderId.openrouter, imageURL: null });
   });
