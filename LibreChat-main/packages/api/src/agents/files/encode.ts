@@ -164,11 +164,22 @@ export function createRunFileMessageEncoder(
       if (deliveryPath !== 'provider' && isToolOwnedAttachment(file)) {
         continue;
       }
+      /* A native document block is only sent for a file this turn routes to `provider`.
+       * A record that predates routing carries no route at all, and an endpoint's MIME
+       * list is filled from defaults rather than an admin opt-in, so matching on the
+       * type alone hands `encodeDocuments` a file the endpoint may not read: the OpenAI
+       * `file` part it emits is rejected outright by a gateway that accepts only text
+       * and image parts, and the document is replayed from history, so that 400 repeats
+       * on every later turn. Such a record has already queued its extracted text above.
+       * Media keeps its type dispatch because those parts are built by their own
+       * encoders and legacy records have no route to re-resolve. */
+      const sendsNativeDocument = deliveryPath === 'provider';
       if (file.type.startsWith('image/')) {
         images.push(file);
       } else if (
-        file.type === 'application/pdf' ||
-        (agent.provider === EModelEndpoint.bedrock && isBedrockDocumentType(file.type))
+        sendsNativeDocument &&
+        (file.type === 'application/pdf' ||
+          (agent.provider === EModelEndpoint.bedrock && isBedrockDocumentType(file.type)))
       ) {
         documents.push(file);
       } else if (file.type.startsWith('audio/')) {
@@ -176,6 +187,7 @@ export function createRunFileMessageEncoder(
       } else if (file.type.startsWith('video/')) {
         videos.push(file);
       } else if (
+        sendsNativeDocument &&
         endpointConfig.supportedMimeTypes &&
         fileConfig.checkType?.(file.type, endpointConfig.supportedMimeTypes)
       ) {

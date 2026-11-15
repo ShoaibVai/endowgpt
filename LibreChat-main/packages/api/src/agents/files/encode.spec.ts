@@ -157,6 +157,53 @@ describe('createRunFileMessageEncoder', () => {
     expect(pdf.llmDeliveryPath).toBe('provider');
   });
 
+  it('never sends a native document for a record that predates delivery routing', async () => {
+    const harness = setup();
+    /* Written before delivery routing existed: no stored route, so nothing re-resolves it, and
+     * the endpoint's default MIME list would otherwise match its type. */
+    const legacy: TFile = { ...pdf, llmDeliveryPath: undefined };
+
+    const messages = await harness.encode([legacy], 'child');
+
+    expect(harness.encodeDocuments).not.toHaveBeenCalled();
+    expect(harness.extractText).toHaveBeenCalledWith(
+      expect.objectContaining({ attachments: [legacy] }),
+    );
+    /* A record with no route has no stored text either, so it contributes nothing rather than
+     * a document part the endpoint rejects on every turn. */
+    expect(messages).toEqual([]);
+  });
+
+  it('sends a native document for a type the endpoint lists once the turn routes it to provider', async () => {
+    const csv: TFile = {
+      ...pdf,
+      file_id: 'input-csv',
+      filename: 'sales.csv',
+      filepath: '/files/sales.csv',
+      type: 'text/csv',
+      llmDeliveryPath: 'provider',
+    };
+    const harness = setup({
+      fileConfig: {
+        endpoints: {
+          openAI: {
+            supportedMimeTypes: ['text/csv'],
+            defaultLLMDeliveryPath: { overrides: { 'text/csv': 'provider' } },
+          },
+        },
+      },
+    });
+
+    await harness.encode([csv], 'child');
+
+    expect(harness.encodeDocuments).toHaveBeenCalledWith(
+      harness.req,
+      [csv],
+      expect.any(Object),
+      harness.getStrategyFunctions,
+    );
+  });
+
   it('delivers stored text only to a child that runs no tool able to read a tool-routed file', async () => {
     const csv: TFile = {
       ...pdf,
