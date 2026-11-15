@@ -544,13 +544,36 @@ docker image prune -f
 docker builder prune -f --filter until=168h
 ```
 
-### 12.6 Push changes from your workstation
+### 12.6 Publish and deploy from your workstation
+
+`deploy.bat` at the repo root does the whole loop — commit, push, pull on the
+VPS, rebuild, verify — in one command:
+
+```bat
+deploy.bat                       :: commit everything, push, rebuild
+deploy.bat "fix: the thing"      :: same, with an explicit message
+deploy.bat --push                :: commit and push only
+deploy.bat --server              :: update the server only, no commit
+deploy.bat --no-build            :: pull and restart without rebuilding images
+deploy.bat --save-pass           :: remember the SSH password locally
+```
+
+It prompts for the SSH password (masked) unless `EH_PASS` is already set or
+`scripts\deploy\.deploy.env` exists; `--save-pass` writes that file, which is
+git-ignored. Requirements on the workstation: `git` with `gh auth setup-git`
+done once, plus `python` and `pip install paramiko` (there is no `sshpass` on
+Windows, so the transport is Paramiko).
+
+The rebuild is started detached on the server and logs to
+`/tmp/endowgpt-up.log`, so closing the window does not abort it. Re-run
+`deploy.bat --server` to watch it finish, or tail the log on the host.
+
+The equivalent by hand:
 
 ```sh
-git checkout main
+cd /var/www/endowhub.io
 git pull --ff-only
-# ...commit work...
-git push origin main
+dc up -d --build
 ```
 
 The server only ever pulls; the deploy key stays read-only.

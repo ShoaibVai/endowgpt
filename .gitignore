@@ -78,3 +78,6 @@ Thumbs.db
 .idea/
 *.swp
 scripts/.brand-derived/
+
+# --- Deploy credentials (written by deploy.bat --save-pass) ---
+scripts/deploy/.deploy.env
